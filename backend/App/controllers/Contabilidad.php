@@ -85,6 +85,7 @@ class Contabilidad extends Controller
 
     public function BuscaGrupo()
     {
+        // Prueba cambio de repositorio
         echo json_encode(ContabilidadDao::BuscaGrupo($_POST));
     }
 
