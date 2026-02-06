@@ -203,6 +203,19 @@ class Contenedor extends Controller
             HTML;
         }
 
+        $permisos = ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
+        if ($this->ValidaPermiso($permisos)) {
+            $menu .= <<<HTML
+            <ul class="nav side-menu">
+                <li><a><i class="glyphicon glyphicon-wrench">&nbsp;</i>Herramientas<span class="fa fa-chevron-down"></span></a>
+                    <ul class="nav child_menu">
+                        <li><a href="/Herramientas/RepDiaAtraso/">Rep Dia de Atraso</a></li>
+                    </ul>
+                </li>
+            </ul>
+            HTML;
+        }
+
         $menu .= <<<HTML
                                 </div>
                             </div>
