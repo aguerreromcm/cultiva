@@ -17,6 +17,172 @@ class Contenedor extends Controller
         parent::__construct();
     }
 
+    /**
+     * Definición del menú lateral. Cada sección puede tener:
+     * - titulo, icono (clase glyphicon), permisos (array), items (array de {texto, url, permisos opcional})
+     * - condicion_extra (opcional): 'herramientas' exige además App::herramientasHabilitado()
+     * Si un ítem tiene 'permisos', se valida aparte; si no, se muestra a quien ve la sección.
+     * @return array
+     */
+    private function getMenuDefinition()
+    {
+        return [
+            [
+                'titulo'   => 'PLD',
+                'icono'    => 'glyphicon-th-list',
+                'permisos' => ['AMGM', 'GASC', 'GBNA', 'LMVH', 'FECR', 'MAJL', 'AFJJ', 'LSOC', 'EZJL'],
+                'items'    => [
+                    ['texto' => 'Reporte Desembolsos', 'url' => '/Operaciones/ReportePLDDesembolsos/'],
+                    ['texto' => 'Reporte Pagos', 'url' => '/Operaciones/ReportePLDPagos/'],
+                    ['texto' => 'Reporte Pagos Edad', 'url' => '/Operaciones/ReportePLDPagosNacimiento/'],
+                    ['texto' => 'Reporte Auditoría', 'url' => '/Operaciones/ReporteAuditoria/'],
+                    ['texto' => 'Identificación (Clientes)', 'url' => '/Operaciones/IdentificacionClientes/'],
+                    ['texto' => 'Cuentas Relacionadas', 'url' => '/Operaciones/CuentasRelacionadas/'],
+                    ['texto' => 'Perfil Transaccional', 'url' => '/Operaciones/PerfilTransaccional/'],
+                ],
+            ],
+            [
+                'titulo'   => 'Api Condusef',
+                'icono'    => 'glyphicon-globe',
+                'permisos' => ['AMGM', 'GASC', 'GBNA', 'LMVH'],
+                'items'    => [
+                    ['texto' => 'Registrar Quejas REDECO', 'url' => '/ApiCondusef/AddRedeco/'],
+                    ['texto' => 'Registrar Quejas REUNE', 'url' => '/ApiCondusef/AddReune/'],
+                ],
+            ],
+            [
+                'titulo'   => 'Créditos',
+                'icono'    => 'glyphicon-usd',
+                'permisos' => ['AMGM', 'PHEE', 'GASC', 'LSOC', 'MAJL', 'AFJJ'],
+                'items'    => [
+                    ['texto' => 'Reporte de Referencias', 'url' => '/Creditos/ReporteReferencias/'],
+                    ['texto' => 'Reporte de Prestamos', 'url' => '/Creditos/ReportePrestamos/'],
+                ],
+            ],
+            [
+                'titulo'   => 'Tesorería',
+                'icono'    => 'glyphicon-piggy-bank',
+                'permisos' => ['AMGM', 'PLMV', 'LGFR', 'MCDP', 'GASC', 'MAJL', 'AFJJ', 'JCMG', 'JACJ', 'MACI'],
+                'items'    => [
+                    ['texto' => 'Consulta Clientes Solicitudes', 'url' => '/Tesoreria/'],
+                    ['texto' => 'Reingresar Clientes a Grupo', 'url' => '/Tesoreria/ReingresarClientesCredito/'],
+                ],
+            ],
+            [
+                'titulo'   => 'Circulo de Crédito',
+                'icono'    => 'glyphicon-ok-circle',
+                'permisos' => ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'],
+                'items'    => [
+                    ['texto' => 'Consulta por Cliente', 'url' => '/CDC/Consulta', 'permisos' => ['AMGM', 'AMOCA']],
+                    ['texto' => 'Mis Consultas', 'url' => '/CDC/ConsultaGrupal', 'permisos' => ['AMGM', 'AMOCA']],
+                    ['texto' => 'Consulta por Cliente (Admin)', 'url' => '/CDC/ConsultaAdmin', 'permisos' => ['AMGM', 'GASC', 'LSOC', 'ADMIN']],
+                    ['texto' => 'Consulta Global', 'url' => '/CDC/ConsultaGlobal', 'permisos' => ['AMGM', 'GASC', 'LSOC', 'ADMIN']],
+                ],
+            ],
+            [
+                'titulo'   => 'Operaciones',
+                'icono'    => 'glyphicon-cog',
+                'permisos' => ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'],
+                'items'    => [
+                    ['texto' => 'Cambio de Sucursal', 'url' => '/Creditos/CambioSucursal/', 'permisos' => ['ADMIN', 'CAMAG', 'ORHM', 'MAPH']],
+                ],
+            ],
+            [
+                'titulo'   => 'Contabilidad',
+                'icono'    => 'glyphicon-briefcase',
+                'permisos' => ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'],
+                'items'    => [
+                    ['texto' => 'Consulta por grupo', 'url' => '/contabilidad/ConsultaGrupo', 'permisos' => ['AMGM', 'AMOCA']],
+                ],
+            ],
+            [
+                'titulo'         => 'Herramientas',
+                'icono'          => 'glyphicon-wrench',
+                'permisos'       => ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'],
+                'condicion_extra'=> 'herramientas',
+                'items'          => [
+                    ['texto' => 'Rep Dia de Atraso', 'url' => '/Herramientas/RepDiaAtraso/'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Comprueba si se debe mostrar una sección (permisos + condicion_extra si existe).
+     * @param array $seccion
+     * @return bool
+     */
+    private function debeMostrarSeccion(array $seccion)
+    {
+        if (!$this->ValidaPermiso($seccion['permisos'])) {
+            return false;
+        }
+        if (!empty($seccion['condicion_extra']) && $seccion['condicion_extra'] === 'herramientas') {
+            return \Core\App::herramientasHabilitado();
+        }
+        return true;
+    }
+
+    /**
+     * Genera el HTML de un ítem de menú hijo (<li><a href="...">texto</a></li>).
+     * Si el ítem tiene 'permisos', se valida; si no, se muestra (la sección ya se validó).
+     * @param array $item {texto, url, permisos opcional}
+     * @return string
+     */
+    private function renderMenuItem(array $item)
+    {
+        if (isset($item['permisos']) && !$this->ValidaPermiso($item['permisos'])) {
+            return '';
+        }
+        $url   = htmlspecialchars($item['url'], ENT_QUOTES, 'UTF-8');
+        $texto = htmlspecialchars($item['texto'], ENT_QUOTES, 'UTF-8');
+        return '<li><a href="' . $url . '">' . $texto . '</a></li>';
+    }
+
+    /**
+     * Genera el HTML de una sección del menú (grupo colapsable con hijos).
+     * @param array $seccion
+     * @return string
+     */
+    private function renderMenuSection(array $seccion)
+    {
+        if (!$this->debeMostrarSeccion($seccion)) {
+            return '';
+        }
+        $partes = [];
+        foreach ($seccion['items'] as $item) {
+            $partes[] = $this->renderMenuItem($item);
+        }
+        $hijos = implode('', $partes);
+        if ($hijos === '') {
+            return '';
+        }
+        $titulo = htmlspecialchars($seccion['titulo'], ENT_QUOTES, 'UTF-8');
+        $icono  = htmlspecialchars($seccion['icono'], ENT_QUOTES, 'UTF-8');
+        return <<<HTML
+            <ul class="nav side-menu">
+                <li><a><i class="glyphicon {$icono}">&nbsp;</i>{$titulo}<span class="fa fa-chevron-down"></span></a>
+                    <ul class="nav child_menu">
+                        {$hijos}
+                    </ul>
+                </li>
+            </ul>
+            HTML;
+    }
+
+    /**
+     * Construye el HTML completo del menú lateral a partir de getMenuDefinition().
+     * @return string
+     */
+    private function buildMenu()
+    {
+        $html = '';
+        foreach ($this->getMenuDefinition() as $seccion) {
+            $html .= $this->renderMenuSection($seccion);
+        }
+        return $html;
+    }
+
     public function header($extra = '')
     {
         $usuario = $this->__usuario;
@@ -51,6 +217,8 @@ class Contenedor extends Controller
             </head>
         HTML;
 
+        $menuHtml = $this->buildMenu();
+
         $menu = <<<HTML
         <body class="nav-md">
             <div class="container body" >
@@ -77,146 +245,8 @@ class Contenedor extends Controller
                             <hr>
                             <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
                                 <div class="menu_section">
-                                    <h3>GENERAL </h3>     
-        HTML;
-
-        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH', 'FECR', 'MAJL', 'AFJJ', 'LSOC', 'EZJL'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-th-list">&nbsp;</i>PLD<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Operaciones/ReportePLDDesembolsos/">Reporte Desembolsos</a></li>
-                        <li><a href="/Operaciones/ReportePLDPagos/">Reporte Pagos</a></li>
-                        <li><a href="/Operaciones/ReportePLDPagosNacimiento/">Reporte Pagos Edad</a></li>
-                        <li><a href="/Operaciones/ReporteAuditoria/">Reporte Auditoría</a></li>
-                        <li><a href="/Operaciones/IdentificacionClientes/">Identificación (Clientes)</a></li>
-                        <li><a href="/Operaciones/CuentasRelacionadas/">Cuentas Relacionadas</a></li>
-                        <li><a href="/Operaciones/PerfilTransaccional/">Perfil Transaccional</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-globe">&nbsp;</i>Api Condusef<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/ApiCondusef/AddRedeco/">Registrar Quejas REDECO</a></li>
-                        <li><a href="/ApiCondusef/AddReune/">Registrar Quejas REUNE</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'PHEE', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-usd">&nbsp;</i>Créditos<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Creditos/ReporteReferencias/">Reporte de Referencias</a></li>
-                        <li><a href="/Creditos/ReportePrestamos/">Reporte de Prestamos</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'PLMV', 'LGFR', 'MCDP', 'GASC', 'MAJL', 'AFJJ', 'JCMG', 'JACJ', 'MACI'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-piggy-bank">&nbsp;</i>Tesorería<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Tesoreria/">Consulta Clientes Solicitudes</a></li>
-                        <li><a href="/Tesoreria/ReingresarClientesCredito/">Reingresar Clientes a Grupo</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-ok-circle">&nbsp;</i>Circulo de Crédito<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/Consulta">Consulta por Cliente</a></li>' : '';
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaGrupal">Mis Consultas</a></li>' : '';
-
-            $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaAdmin">Consulta por Cliente (Admin)</a></li>' : '';
-
-            $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaGlobal">Consulta Global</a></li>' : '';
-
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-cog">&nbsp;</i>Operaciones<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['ADMIN', 'CAMAG', 'ORHM', 'MAPH'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/Creditos/CambioSucursal/">Cambio de Sucursal</a></li>' : '';
-
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-briefcase">&nbsp;</i>Contabilidad<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/contabilidad/ConsultaGrupo">Consulta por grupo</a></li>' : '';
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-wrench">&nbsp;</i>Herramientas<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Herramientas/RepDiaAtraso/">Rep Dia de Atraso</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $menu .= <<<HTML
+                                    <h3>GENERAL </h3>
+                                    {$menuHtml}
                                 </div>
                             </div>
                         </div>

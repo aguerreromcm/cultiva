@@ -6,6 +6,7 @@ defined("APPPATH") or die("Access denied");
 
 use \Core\View;
 use \Core\Controller;
+use \Core\App;
 use \App\models\Herramientas as HerramientasDao;
 
 class Herramientas extends Controller
@@ -15,131 +16,174 @@ class Herramientas extends Controller
     function __construct()
     {
         parent::__construct();
+        if (!App::herramientasHabilitado()) {
+            header('Location: /Principal/');
+            exit;
+        }
         $this->_contenedor = new Contenedor;
         View::set('header', $this->_contenedor->header());
         View::set('footer', $this->_contenedor->footer());
     }
 
+    /**
+     * Vista del reporte Día de Atraso (tabla + botones Excel y CSV).
+     * Los datos se cargan por AJAX. Opcional: filtrar desde mes y año.
+     */
     public function RepDiaAtraso()
     {
+        $meses = [
+            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio',
+            7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+        ];
+        $anio_actual = (int) date('Y');
+        $options_mes = '<option value="">Todos</option>';
+        foreach ($meses as $n => $nombre) {
+            $options_mes .= '<option value="' . $n . '">' . $nombre . '</option>';
+        }
+        $options_anio = '<option value="">Todos</option>';
+        for ($a = $anio_actual; $a >= $anio_actual - 15; $a--) {
+            $options_anio .= '<option value="' . $a . '">' . $a . '</option>';
+        }
         $extraFooter = <<<HTML
         <script>
-            $(document).ready(function () {
-                $("#muestra-cupones").tablesorter();
-                var oTable = $("#muestra-cupones").DataTable({
-                    lengthMenu: [[13, 50, -1], [13, 50, "Todos"]],
-                    columnDefs: [{ orderable: false, targets: 0 }],
-                    order: false
+            {$this->mensajes}
+            {$this->configuraTabla}
+            {$this->actualizaDatosTabla}
+            const idTablaRepDia = "muestra-rep-dia-atraso";
+            function consultarRepDiaAtraso() {
+                var mes = $("#filtro_mes").val();
+                var anio = $("#filtro_anio").val();
+                var params = [];
+                if (mes) params.push("mes=" + mes);
+                if (anio) params.push("anio=" + anio);
+                var url = "/Herramientas/GetRepDiaAtraso/" + (params.length ? "?" + params.join("&") : "");
+                swal({ text: "Procesando la solicitud, espere un momento...", icon: "/img/wait.gif", button: false, closeOnClickOutside: false, closeOnEsc: false });
+                $.ajax({
+                    type: "GET",
+                    url: url,
+                    timeout: 600000,
+                    success: function(res) {
+                        swal.close();
+                        try { res = typeof res === "string" ? JSON.parse(res) : res; } catch (e) { showError("Error al procesar la respuesta"); actualizaDatosTabla(idTablaRepDia, []); return; }
+                        if (!res.success) {
+                            showError(res.mensaje || "Error al cargar el reporte");
+                            actualizaDatosTabla(idTablaRepDia, []);
+                            return;
+                        }
+                        actualizaDatosTabla(idTablaRepDia, res.datos || []);
+                    },
+                    error: function() {
+                        swal.close();
+                        showError("La consulta tardó demasiado o hubo un error. Tiempo máximo: 10 minutos.");
+                        actualizaDatosTabla(idTablaRepDia, []);
+                    }
                 });
-
-                $("#export_excel_consulta").click(function () {
-                    descargaExcel("/Herramientas/generarExcelRepDiaAtraso/");
+            }
+            $(document).ready(function(){
+                $("#" + idTablaRepDia).DataTable({
+                    lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "Todos"]],
+                    order: [[4, "desc"]],
+                    language: {
+                        emptyTable: "Seleccione filtros y pulse Consultar para cargar el reporte.",
+                        paginate: { previous: "Anterior", next: "Siguiente" },
+                        info: "Mostrando de _START_ a _END_ de _TOTAL_ registros",
+                        infoEmpty: "Sin registros",
+                        zeroRecords: "No se encontraron registros",
+                        lengthMenu: "Mostrar _MENU_ registros",
+                        search: "Buscar:"
+                    }
                 });
-
-                $("#export_csv_consulta").click(function () {
-                    descargaExcel("/Herramientas/generarCsvRepDiaAtraso/");
+                $("#btn_consultar").click(consultarRepDiaAtraso);
+                $("#btn_excel").click(function(){
+                    var mes = $("#filtro_mes").val();
+                    var anio = $("#filtro_anio").val();
+                    var qs = (mes || anio) ? "?" + [mes ? "mes=" + mes : "", anio ? "anio=" + anio : ""].filter(Boolean).join("&") : "";
+                    window.open("/Herramientas/RepDiaAtraso_excel/" + qs, "_blank");
+                });
+                $("#btn_csv").click(function(){
+                    var mes = $("#filtro_mes").val();
+                    var anio = $("#filtro_anio").val();
+                    var qs = (mes || anio) ? "?" + [mes ? "mes=" + mes : "", anio ? "anio=" + anio : ""].filter(Boolean).join("&") : "";
+                    window.location.href = "/Herramientas/RepDiaAtraso_csv/" + qs;
                 });
             });
-
-            var descargaExcel = function (url) {
-                swal({ text: "Generando archivo, espere un momento...", icon: "/img/wait.gif", closeOnClickOutside: false, closeOnEsc: false });
-                var ventana = window.open(url, "_blank");
-                var intervalo = setInterval(function () {
-                    if (ventana.closed) {
-                        clearInterval(intervalo);
-                        swal.close();
-                    }
-                }, 1000);
-                window.focus();
-            };
         </script>
         HTML;
-
-        $Consulta = HerramientasDao::ConsultarRepDiaAtraso();
-        $tabla = "";
-
-        if (empty($Consulta) || (isset($Consulta[0]) && $Consulta[0] == '')) {
-            View::set('mensaje', 'No se encontraron registros para el reporte de días de atraso.');
-            $vista = "herramienta_rep_dia_atraso_message";
-        } else {
-            foreach ($Consulta as $key => $value) {
-                $codCte = $value['COD_CTE'] ?? '';
-                $ciclo = $value['CICLO'] ?? '';
-                $nombre = htmlspecialchars($value['NOMBRE'] ?? '');
-                $inicio = isset($value['INICIO']) ? (is_object($value['INICIO']) ? $value['INICIO']->format('Y-m-d') : $value['INICIO']) : '';
-                $diasAtraso = $value['DIAS_ATRASO'] ?? '0';
-                $tabla .= <<<HTML
-                <tr style="padding: 0px !important;">
-                    <td style="padding: 0px !important;">{$codCte}</td>
-                    <td style="padding: 0px !important;">{$ciclo}</td>
-                    <td style="padding: 0px !important;">{$nombre}</td>
-                    <td style="padding: 0px !important;">{$inicio}</td>
-                    <td style="padding: 0px !important;">{$diasAtraso}</td>
-                </tr>
-                HTML;
-            }
-
-            View::set('tabla', $tabla);
-            $vista = "herramienta_rep_dia_atraso_busqueda";
-        }
-
-        View::set('header', $this->_contenedor->header(self::GetExtraHeader("Rep Dia de Atraso")));
+        View::set('header', $this->_contenedor->header($this->GetExtraHeader("Rep Dia de Atraso")));
         View::set('footer', $this->_contenedor->footer($extraFooter));
-        View::render($vista);
+        View::set('tabla', '');
+        View::set('options_mes', $options_mes);
+        View::set('options_anio', $options_anio);
+        View::render('herramientas_rep_dia_atraso');
     }
 
-    public function generarExcelRepDiaAtraso()
+    /**
+     * Devuelve el reporte en JSON para la carga por AJAX.
+     * Parámetros opcionales GET: mes (1-12), anio (ej. 2025).
+     * Tiempo máximo de ejecución: 10 minutos (para consultas pesadas).
+     */
+    public function GetRepDiaAtraso()
+    {
+        set_time_limit(600);
+        $datos = array_filter([
+            'mes'  => isset($_GET['mes']) ? $_GET['mes'] : null,
+            'anio' => isset($_GET['anio']) ? $_GET['anio'] : null,
+        ]);
+        echo json_encode(HerramientasDao::GetRepDiaAtraso($datos));
+    }
+
+    /**
+     * Descarga del reporte en Excel.
+     */
+    public function RepDiaAtraso_excel()
     {
         require_once dirname(__DIR__) . '/../libs/PhpSpreadsheet/PhpSpreadsheet.php';
-
         $estilos = \PHPSpreadsheet::GetEstilosExcel();
-        $soloCentrado = ['estilo' => $estilos['centrado']];
-
+        $centrado = ['estilo' => $estilos['centrado']];
         $columnas = [
-            \PHPSpreadsheet::ColumnaExcel('COD_CTE', 'Código Cliente', $soloCentrado),
-            \PHPSpreadsheet::ColumnaExcel('CICLO', 'Ciclo', $soloCentrado),
+            \PHPSpreadsheet::ColumnaExcel('COD_CTE', 'Código Cliente', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('CICLO', 'Ciclo', $centrado),
             \PHPSpreadsheet::ColumnaExcel('NOMBRE', 'Nombre'),
             \PHPSpreadsheet::ColumnaExcel('INICIO', 'Inicio', ['estilo' => $estilos['fecha']]),
-            \PHPSpreadsheet::ColumnaExcel('DIAS_ATRASO', 'Días de Atraso', $soloCentrado)
+            \PHPSpreadsheet::ColumnaExcel('DIAS_ATRASO', 'Días Atraso', $centrado),
         ];
-
-        $filas = HerramientasDao::ConsultarRepDiaAtraso();
-
-        \PHPSpreadsheet::DescargaExcel('Rep_Dia_de_Atraso', 'Reporte', 'Rep Dia de Atraso', $columnas, $filas);
+        $datos = array_filter([
+            'mes'  => isset($_GET['mes']) ? $_GET['mes'] : null,
+            'anio' => isset($_GET['anio']) ? $_GET['anio'] : null,
+        ]);
+        $resultado = HerramientasDao::GetRepDiaAtraso($datos);
+        $filas = ($resultado['success'] && isset($resultado['datos'])) ? $resultado['datos'] : [];
+        \PHPSpreadsheet::DescargaExcel('Rep Dia de Atraso', 'Reporte', 'Días de atraso', $columnas, $filas);
     }
 
-    public function generarCsvRepDiaAtraso()
+    /**
+     * Descarga del reporte en CSV.
+     * Parámetros opcionales GET: mes (1-12), anio (ej. 2025).
+     */
+    public function RepDiaAtraso_csv()
     {
-        $filas = HerramientasDao::ConsultarRepDiaAtraso();
-
-        $columnas = ['COD_CTE', 'CICLO', 'NOMBRE', 'INICIO', 'DIAS_ATRASO'];
-        $titulos = ['Código Cliente', 'Ciclo', 'Nombre', 'Inicio', 'Días de Atraso'];
-
+        $datos = array_filter([
+            'mes'  => isset($_GET['mes']) ? $_GET['mes'] : null,
+            'anio' => isset($_GET['anio']) ? $_GET['anio'] : null,
+        ]);
+        $resultado = HerramientasDao::GetRepDiaAtraso($datos);
+        $filas = ($resultado['success'] && isset($resultado['datos'])) ? $resultado['datos'] : [];
+        $nombre = 'rep_dia_atraso_' . date('Y-m-d_His') . '.csv';
         header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment;filename="Rep_Dia_de_Atraso.csv"');
-        header('Cache-Control: max-age=0');
-        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
-        header('Pragma: public');
-
-        $output = fopen('php://output', 'w');
-        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
-        fputcsv($output, $titulos, ',', '"');
-
+        header('Content-Disposition: attachment; filename="' . $nombre . '"');
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
+        fputcsv($out, ['COD_CTE', 'CICLO', 'NOMBRE', 'INICIO', 'DIAS_ATRASO'], ',');
         foreach ($filas as $fila) {
-            if (is_array($fila)) {
-                $linea = [];
-                foreach ($columnas as $col) {
-                    $valor = $fila[$col] ?? '';
-                    if (is_object($valor) && method_exists($valor, 'format')) {
-                        $valor = $valor->format('Y-m-d');
-                    }
-                    $linea[] = $valor;
-                }
-                fputcsv($output, $linea, ',', '"');
-            }
+            fputcsv($out, [
+                $fila['COD_CTE'] ?? '',
+                $fila['CICLO'] ?? '',
+                $fila['NOMBRE'] ?? '',
+                $fila['INICIO'] ?? '',
+                $fila['DIAS_ATRASO'] ?? '',
+            ], ',');
         }
-
-        fclose($output);
+        fclose($out);
+        exit;
     }
 }
