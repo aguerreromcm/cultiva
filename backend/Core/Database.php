@@ -92,6 +92,31 @@ class Database
         exit();
     }
 
+    public function AutoCommitOff()
+    {
+        $this->db_activa->setAttribute(PDO::ATTR_AUTOCOMMIT, 0);
+    }
+
+    public function AutoCommitOn()
+    {
+        $this->db_activa->setAttribute(PDO::ATTR_AUTOCOMMIT, 1);
+    }
+
+    public function IniciaTransaccion()
+    {
+        $this->db_activa->beginTransaction();
+    }
+
+    public function CancelaTransaccion()
+    {
+        $this->db_activa->rollBack();
+    }
+
+    public function ConfirmaTransaccion()
+    {
+        $this->db_activa->commit();
+    }
+
     private function muestraError($e, $sql = null, $parametros = null)
     {
         $error = "Error en DB: " . $e->getMessage();
