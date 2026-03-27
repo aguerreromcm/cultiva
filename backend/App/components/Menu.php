@@ -159,6 +159,16 @@ class Menu
         ];
     }
 
+    /** Opciones del submenú PUI */
+    private function opcionesPui()
+    {
+        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH', 'ADMIN'];
+        return [
+            $this->enlace('Consulta de Persona', '/pui/consulta-persona', $permisos),
+            $this->enlace('Reportes / Movimientos', '/pui/movimientos', $permisos),
+        ];
+    }
+
     /** Sección: GENERAL (todas las opciones principales) */
     private function seccionGeneral()
     {
@@ -170,6 +180,7 @@ class Menu
             $this->submenu('Circulo de Crédito', 'glyphicon glyphicon-ok-circle', $this->opcionesCirculoCredito()),
             $this->submenu('Operaciones', 'glyphicon glyphicon-cog', $this->opcionesOperaciones()),
             $this->submenu('Contabilidad', 'glyphicon glyphicon-briefcase', $this->opcionesContabilidad()),
+            $this->submenu('PUI', 'glyphicon glyphicon-globe', $this->opcionesPui()),
         ];
 
         if ($this->mostrarHerramientas) {
@@ -233,8 +244,9 @@ class Menu
             if ($html !== '') {
                 $titulo = htmlspecialchars($opcion['titulo'], ENT_QUOTES, 'UTF-8');
                 $icono  = htmlspecialchars($opcion['icono'], ENT_QUOTES, 'UTF-8');
+                $activeParent = strpos($html, 'class="active"') !== false ? ' class="active"' : '';
                 return <<<HTML
-                    <li>
+                    <li{$activeParent}>
                         <a>
                             <i class="{$icono}"></i>&nbsp;{$titulo}<span class="fa fa-chevron-down"></span>
                         </a>
@@ -251,8 +263,9 @@ class Menu
             $titulo = htmlspecialchars($opcion['titulo'], ENT_QUOTES, 'UTF-8');
             $url    = htmlspecialchars($opcion['url']['directorio'], ENT_QUOTES, 'UTF-8');
             $icono  = isset($opcion['icono']) ? '<i class="' . htmlspecialchars($opcion['icono'], ENT_QUOTES, 'UTF-8') . '"></i>&nbsp;' : '';
+            $active = $this->esRutaActiva($opcion['url']['directorio']) ? ' class="active"' : '';
             return <<<HTML
-                <li>
+                <li{$active}>
                     <a href="{$url}">
                         {$icono}{$titulo}
                     </a>
@@ -265,5 +278,18 @@ class Menu
     private function ValidaPermisos($permisos)
     {
         return in_array($this->perfil, $permisos) || in_array($this->usuario, $permisos);
+    }
+
+    private function esRutaActiva($ruta)
+    {
+        $actual = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+        $normalActual = '/' . trim($actual, '/');
+        $normalRuta = '/' . trim((string) $ruta, '/');
+
+        if ($normalRuta === '/pui/consulta-persona' || $normalRuta === '/pui/movimientos') {
+            return strcasecmp($normalActual, $normalRuta) === 0;
+        }
+
+        return strcasecmp($normalActual, $normalRuta) === 0 || stripos($normalActual . '/', $normalRuta . '/') === 0;
     }
 }
