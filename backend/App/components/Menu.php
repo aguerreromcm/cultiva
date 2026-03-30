@@ -159,16 +159,6 @@ class Menu
         ];
     }
 
-    /** Opciones del submenú PUI */
-    private function opcionesPui()
-    {
-        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH', 'ADMIN'];
-        return [
-            $this->enlace('Consulta de Persona', '/pui/consulta-persona', $permisos),
-            $this->enlace('Reportes / Movimientos', '/pui/movimientos', $permisos),
-        ];
-    }
-
     /** Sección: GENERAL (todas las opciones principales) */
     private function seccionGeneral()
     {
@@ -180,7 +170,6 @@ class Menu
             $this->submenu('Circulo de Crédito', 'glyphicon glyphicon-ok-circle', $this->opcionesCirculoCredito()),
             $this->submenu('Operaciones', 'glyphicon glyphicon-cog', $this->opcionesOperaciones()),
             $this->submenu('Contabilidad', 'glyphicon glyphicon-briefcase', $this->opcionesContabilidad()),
-            $this->submenu('PUI', 'glyphicon glyphicon-globe', $this->opcionesPui()),
         ];
 
         if ($this->mostrarHerramientas) {
@@ -285,10 +274,6 @@ class Menu
         $actual = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
         $normalActual = '/' . trim($actual, '/');
         $normalRuta = '/' . trim((string) $ruta, '/');
-
-        if ($normalRuta === '/pui/consulta-persona' || $normalRuta === '/pui/movimientos') {
-            return strcasecmp($normalActual, $normalRuta) === 0;
-        }
 
         return strcasecmp($normalActual, $normalRuta) === 0 || stripos($normalActual . '/', $normalRuta . '/') === 0;
     }

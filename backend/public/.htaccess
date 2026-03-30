@@ -2,15 +2,6 @@ Options -Multiviews
 
 RewriteEngine On
 
-# Vistas PUI integradas al layout MVC
-RewriteRule ^pui/consulta-persona/?$ index.php?url=Pui/ConsultaPersona [L,QSA,NC]
-RewriteRule ^pui/movimientos/?$ index.php?url=Pui/Movimientos [L,QSA,NC]
-
-# API PUI (REST JSON bajo /api/pui/…)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/pui(/.*)?$ api/pui/index.php [L,QSA]
-
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 
