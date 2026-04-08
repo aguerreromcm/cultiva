@@ -32,8 +32,9 @@ class SincronizaBloqueoClientes extends Model
                 CL_MARCA CM
             WHERE
                 CM.CDGEM = 'EMPFIN'
-                AND CAUSA != 9
-                AND CAUSA != 10
+                AND CM.CAUSA != 9
+                AND CM.CAUSA != 10
+                AND CM.CAUSA != 11
         SQL;
 
         $servidor = $mcm ? 'SERVIDOR-MCM' : null;
