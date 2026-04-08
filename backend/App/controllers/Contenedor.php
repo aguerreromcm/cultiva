@@ -5,6 +5,7 @@ namespace App\controllers;
 defined("APPPATH") or die("Access denied");
 
 use \Core\Controller;
+use App\components\Menu;
 
 require_once dirname(__DIR__) . '../../libs/mpdf/mpdf.php';
 require_once dirname(__DIR__) . '../../libs/PhpSpreadsheet/PhpSpreadsheet.php';
@@ -51,6 +52,13 @@ class Contenedor extends Controller
             </head>
         HTML;
 
+        $menuComponent = new Menu(
+            $perfil,
+            $usuario,
+            \Core\App::herramientasHabilitado()
+        );
+        $menuHtml = $menuComponent->mostrar();
+
         $menu = <<<HTML
         <body class="nav-md">
             <div class="container body" >
@@ -74,138 +82,7 @@ class Contenedor extends Controller
                                     <span><b>PERFIL:</b> <span class="fa fa-key"></span> {$perfil}</span>
                                 </div>
                             </div>
-                            <hr>
-                            <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
-                                <div class="menu_section">
-                                    <h3>GENERAL </h3>     
-        HTML;
-
-        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH', 'FECR', 'MAJL', 'AFJJ', 'LSOC', 'EZJL'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-th-list">&nbsp;</i>PLD<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Operaciones/ReportePLDDesembolsos/">Reporte Desembolsos</a></li>
-                        <li><a href="/Operaciones/ReportePLDPagos/">Reporte Pagos</a></li>
-                        <li><a href="/Operaciones/ReportePLDPagosNacimiento/">Reporte Pagos Edad</a></li>
-                        <li><a href="/Operaciones/ReporteAuditoria/">Reporte Auditoría</a></li>
-                        <li><a href="/Operaciones/IdentificacionClientes/">Identificación (Clientes)</a></li>
-                        <li><a href="/Operaciones/CuentasRelacionadas/">Cuentas Relacionadas</a></li>
-                        <li><a href="/Operaciones/PerfilTransaccional/">Perfil Transaccional</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-globe">&nbsp;</i>Api Condusef<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/ApiCondusef/AddRedeco/">Registrar Quejas REDECO</a></li>
-                        <li><a href="/ApiCondusef/AddReune/">Registrar Quejas REUNE</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'PHEE', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-usd">&nbsp;</i>Créditos<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Creditos/ReporteReferencias/">Reporte de Referencias</a></li>
-                        <li><a href="/Creditos/ReportePrestamos/">Reporte de Prestamos</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'PLMV', 'LGFR', 'MCDP', 'GASC', 'MAJL', 'AFJJ', 'JCMG', 'JACJ', 'MACI'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-piggy-bank">&nbsp;</i>Tesorería<span class="fa fa-chevron-down"></span></a>
-                    <ul class="nav child_menu">
-                        <li><a href="/Tesoreria/">Consulta Clientes Solicitudes</a></li>
-                        <li><a href="/Tesoreria/ReingresarClientesCredito/">Reingresar Clientes a Grupo</a></li>
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-ok-circle">&nbsp;</i>Circulo de Crédito<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/Consulta">Consulta por Cliente</a></li>' : '';
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaGrupal">Mis Consultas</a></li>' : '';
-
-            $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaAdmin">Consulta por Cliente (Admin)</a></li>' : '';
-
-            $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/CDC/ConsultaGlobal">Consulta Global</a></li>' : '';
-
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-cog">&nbsp;</i>Operaciones<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['ADMIN', 'CAMAG', 'ORHM', 'MAPH'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/Creditos/CambioSucursal/">Cambio de Sucursal</a></li>' : '';
-
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'ADMIN', 'AMOCA', 'MAJL', 'AFJJ'];
-        if ($this->ValidaPermiso($permisos)) {
-            $menu .= <<<HTML
-            <ul class="nav side-menu">
-                <li><a><i class="glyphicon glyphicon-briefcase">&nbsp;</i>Contabilidad<span class="fa fa-chevron-down"></span></a>
-                <ul class="nav child_menu">
-            HTML;
-
-            $permisos = ['AMGM', 'AMOCA'];
-            $menu .= $this->ValidaPermiso($permisos) ? '<li><a href="/contabilidad/ConsultaGrupo">Consulta por grupo</a></li>' : '';
-            $menu .= <<<HTML
-                    </ul>
-                </li>
-            </ul>
-            HTML;
-        }
-
-        $menu .= <<<HTML
-                                </div>
-                            </div>
+                            {$menuHtml}
                         </div>
                     </div>
                     <div class="top_nav ">

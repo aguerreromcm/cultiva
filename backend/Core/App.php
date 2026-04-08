@@ -109,6 +109,22 @@ class App
     }
 
     /**
+     * Indica si el menú Herramientas está habilitado.
+     * Solo devuelve true cuando en configuracion.ini la clave HERRAMIENTAS_CLAVE es exactamente "accesoh".
+     * @return bool
+     */
+    public static function herramientasHabilitado()
+    {
+        $config = self::getConfig();
+        $acceso = $config['acceso'] ?? [];
+        $clave = trim(is_array($acceso) ? ($acceso['HERRAMIENTAS_CLAVE'] ?? '') : '');
+        if ($clave === '') {
+            $clave = trim($config['HERRAMIENTAS_CLAVE'] ?? '');
+        }
+        return $clave === 'accesoh';
+    }
+
+    /**
      * [getController Devolvemos el controlador actual]
      * @return [type] [String]
      */
