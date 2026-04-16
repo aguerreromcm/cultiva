@@ -133,7 +133,7 @@ class Contabilidad extends Controller
                 const idTabla = "reporteGL"
 
                 const columnasMoneda = [
-                    "SDO_INI", "DEP_BANCO", "DEP_EXED", "PAGO_GL", "SDO_FIN", "TOTAL",
+                    "SDO_INI", "SDO_FIN",
                     "PAGO COMISION",
                     "DEVOLUCION POR CANCELACION DE CHEQUE",
                     "CONCILIACION COMISION",
@@ -266,11 +266,7 @@ class Contabilidad extends Controller
             \PHPSpreadsheet::ColumnaExcel('GRUPO', 'Grupo'),
             \PHPSpreadsheet::ColumnaExcel('SITUACION', 'Situación'),
             \PHPSpreadsheet::ColumnaExcel('SDO_INI', 'Saldo Inicial', $moneda),
-            \PHPSpreadsheet::ColumnaExcel('DEP_BANCO', 'Depósito Banco', $moneda),
-            \PHPSpreadsheet::ColumnaExcel('DEP_EXED', 'Depósito Excedente', $moneda),
-            \PHPSpreadsheet::ColumnaExcel('PAGO_GL', 'Pago GL', $moneda),
             \PHPSpreadsheet::ColumnaExcel('SDO_FIN', 'Saldo Final', $moneda),
-            \PHPSpreadsheet::ColumnaExcel('TOTAL', 'Total', $moneda),
             \PHPSpreadsheet::ColumnaExcel('PAGO COMISION', 'Pago Comisión', $moneda),
             \PHPSpreadsheet::ColumnaExcel('DEVOLUCION POR CANCELACION DE CHEQUE', 'Devolución por Cancelación de Cheque', $moneda),
             \PHPSpreadsheet::ColumnaExcel('CONCILIACION COMISION', 'Conciliación Comisión', $moneda),

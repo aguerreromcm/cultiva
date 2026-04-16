@@ -103,4 +103,57 @@ class ConsultaUdiDolar extends Model
 
         return [$ret_dolar, $ret_udi];
     }
+
+    public static function getUMA()
+    {
+        $db = new Database();
+        if ($db->db_activa == null) return self::Responde(false, "Error al conectar a la base de datos.");
+        
+        $qry = <<<SQL
+                SELECT
+                    TO_CHAR(FECHA_CALC, 'YYYY') AS ANIO
+                FROM
+                    UNIDAD@DB_CULTIVA
+                WHERE
+                    CODIGO = 'UMA'
+                ORDER BY
+                    FECHA_CALC DESC
+                FETCH FIRST 1 ROWS ONLY
+        SQL;
+
+        $res = $db->query($qry);
+        if ($res === false) return self::Responde(false, "Error al obtener el valor de la UMA.");
+        return self::Responde(true, "Valor de la UMA obtenido correctamente.", ['UMA_ANTERIOR' => $res['ANIO']]);
+    }
+
+    public static function AddUMA($fecha, $valor)
+    {
+        $db = new Database();
+        if ($db->db_activa == null) return self::Responde(false, "Error al conectar a la base de datos.");
+
+        $query_uma = <<<SQL
+            INSERT INTO
+                UNIDAD (
+                    CODIGO,
+                    DESCRIPCION,
+                    VALOR,
+                    FECHA_CALC,
+                    ABREV,
+                    CDGEM
+                )
+            VALUES
+            (
+                'UMA',
+                'Obtenido mediante la API de INEGI',
+                $valor,
+                TIMESTAMP '$fecha 00:00:00.000000',
+                'UMA',
+                'EMPFIN'
+            )
+        SQL;
+
+        $res = $db->insert($query_uma);
+        if ($res === true) return self::Responde(true, "UMA registrada correctamente.", ['query' => $query_uma]);
+        else return self::Responde(false, "Error al registrar la UMA.", ['query' => $query_uma], $res);
+    }
 }

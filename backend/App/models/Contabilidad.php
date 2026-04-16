@@ -60,33 +60,17 @@ class Contabilidad extends Model
     public static function GetReporteGL($datos)
     {
         $qry = <<<SQL
-            WITH GARANTIAS AS (
+            WITH SALDO_INICIAL AS (
                 SELECT
                     CDGCLNS AS CREDITO
-                    ,SUM(CASE
-                        WHEN ESTATUS <> 'CA' AND TRUNC(FPAGO) < TO_DATE(:ffin1, 'YYYY-MM-DD') THEN CANTIDAD
-                        ELSE
-                            CASE WHEN TRUNC(F_ULT_ACT) < TO_DATE(:ffin2, 'YYYY-MM-DD') THEN 0
-                            ELSE CANTIDAD END
-                        END) AS SDO_INI
-                    ,SUM(CASE
-                        WHEN ESTATUS = 'RE' AND CDGCB NOT IN ('12','19') AND TRUNC(FPAGO) = TO_DATE(:ffin3, 'YYYY-MM-DD')
-                        THEN ABS(CANTIDAD)
-                        ELSE 0 END) AS DEP_BANCO
-                    ,SUM(CASE
-                        WHEN ESTATUS = 'RE' AND CDGCB = '19' AND TRUNC(FPAGO) = TO_DATE(:ffin4, 'YYYY-MM-DD')
-                        THEN ABS(CANTIDAD)
-                        ELSE 0 END) AS DEP_EXED
-                    ,SUM(CASE
-                        WHEN ESTATUS = 'CP' AND TRUNC(FPAGO) = TO_DATE(:ffin5, 'YYYY-MM-DD')
-                        THEN ABS(CANTIDAD)
-                        ELSE 0 END) AS PAGO_GL
-                    ,SUM(CASE
-                        WHEN ESTATUS <> 'CA' AND TRUNC(FPAGO) <= TO_DATE(:ffin6, 'YYYY-MM-DD') THEN CANTIDAD
-                        ELSE
-                            CASE WHEN TRUNC(F_ULT_ACT) <= TO_DATE(:ffin7, 'YYYY-MM-DD') THEN 0
-                            ELSE CANTIDAD END
-                        END) AS SDO_FIN
+                    ,SUM(CANTIDAD) AS SDO_INI
+                FROM PAG_GAR_SIM
+                WHERE TRUNC(FPAGO) < TO_DATE(:fechaInicial, 'YYYY-MM-DD')
+                GROUP BY CDGEM, CDGCLNS, CLNS
+            )
+            , GARANTIAS AS (
+                SELECT
+                    CDGCLNS AS CREDITO
                     ,SUM(DECODE(ESTATUS, 'RE', CANTIDAD, 0)) AS RE
                     ,SUM(DECODE(ESTATUS, 'DC', CANTIDAD, 0)) AS DC
                     ,SUM(DECODE(ESTATUS, 'CO', CANTIDAD, 0)) AS CO
@@ -101,20 +85,21 @@ class Contabilidad extends Model
                     ,SUM(DECODE(ESTATUS, 'DE', CANTIDAD, 0)) AS DE
                     ,SUM(DECODE(ESTATUS, 'CD', CANTIDAD, 0)) AS CD
                     ,SUM(CANTIDAD) AS TOTAL
+                    ,COUNT(*) AS MOVIMIENTOS
                 FROM PAG_GAR_SIM
-                WHERE TRUNC(FPAGO) BETWEEN TO_DATE(:fini, 'YYYY-MM-DD') AND TO_DATE(:ffin8, 'YYYY-MM-DD')
+                WHERE TRUNC(FPAGO) BETWEEN TO_DATE(:fechaInicial, 'YYYY-MM-DD') AND TO_DATE(:fechaFinal, 'YYYY-MM-DD')
                 GROUP BY CDGEM, CDGCLNS, CLNS
             )
-            ,CREDITOS AS (
-                SELECT
-                     SN.CDGNS AS CREDITO
+            , CREDITOS AS (
+                SELECT 
+                    SN.CDGNS AS CREDITO
                     ,DECODE(NVL(PRN.SITUACION, SN.SITUACION), 'R', 'RECHAZADO', 'A', 'AUTORIZADO POR CARTERA', 'S', 'SOLICITADO', 'E', 'ENTREGADO', 'D', 'DEVUELTO', 'T', 'AUTORIZADO POR TESORERIA', 'L', 'LIQUIDADO', 'NO APLICA') AS SITUACION
                     ,ROW_NUMBER() OVER (PARTITION BY SN.CDGEM, SN.CDGNS ORDER BY SN.INICIO DESC, SN.SOLICITUD DESC) AS RN
                 FROM SN
                     LEFT JOIN PRN ON SN.CDGEM = PRN.CDGEM AND SN.CDGNS = PRN.CDGNS AND SN.CICLO = PRN.CICLO AND SN.INICIO = PRN.INICIO
                 ORDER BY SN.INICIO DESC
             )
-            ,GRUPOS AS (
+            , GRUPOS AS (
                 SELECT
                     NS.CODIGO AS CREDITO
                     ,NS.NOMBRE AS GRUPO
@@ -133,46 +118,35 @@ class Contabilidad extends Model
                 ,C.CREDITO
                 ,GRP.GRUPO
                 ,C.SITUACION
-                ,G.SDO_INI
-                ,G.DEP_BANCO
-                ,G.DEP_EXED
-                ,G.PAGO_GL
-                ,G.SDO_FIN
-                ,G.TOTAL
-                ,G.RE AS "PAGO COMISION"
-                ,G.DC AS "DEVOLUCION POR CANCELACION DE CHEQUE"
-                ,G.CO AS "CONCILIACION COMISION"
-                ,G.DA AS "PAGO ADELANTADO"
-                ,G.CP AS "CANCELACION POR APLICACION A PAGO DE CREDITO"
-                ,G.CG AS "CANCELACION POR TRASPASO DE GARANTIA A CICLO SIGUIENTE"
-                ,G.CR AS "CANCELACION PAGO COMISION"
-                ,G.CC AS "CANCELACION DE CONCILIACION COMISION"
-                ,G.CI AS "CANCELACION DE PAGO ADELANTADO"
-                ,G.CA AS "MOVIMIENTO CANCELADO"
-                ,G.GP AS "TRASPASO DE GARANTIA A PAGO"
-                ,G.DE AS "DEVOLUCION POR DEPOSITO EXCEDENTE"
-                ,G.CD AS "CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA"
+                ,NVL(SI.SDO_INI, 0) AS SDO_INI
+                ,NVL(SI.SDO_INI, 0) + NVL(G.TOTAL, 0) AS SDO_FIN
+                ,NVL(G.RE, 0) AS "PAGO COMISION"
+                ,NVL(G.DC, 0) AS "DEVOLUCION POR CANCELACION DE CHEQUE"
+                ,NVL(G.CO, 0) AS "CONCILIACION COMISION"
+                ,NVL(G.DA, 0) AS "PAGO ADELANTADO"
+                ,NVL(G.CP, 0) AS "CANCELACION POR APLICACION A PAGO DE CREDITO"
+                ,NVL(G.CG, 0) AS "CANCELACION POR TRASPASO DE GARANTIA A CICLO SIGUIENTE"
+                ,NVL(G.CR, 0) AS "CANCELACION PAGO COMISION"
+                ,NVL(G.CC, 0) AS "CANCELACION DE CONCILIACION COMISION"
+                ,NVL(G.CI, 0) AS "CANCELACION DE PAGO ADELANTADO"
+                ,NVL(G.CA, 0) AS "MOVIMIENTO CANCELADO"
+                ,NVL(G.GP, 0) AS "TRASPASO DE GARANTIA A PAGO"
+                ,NVL(G.DE, 0) AS "DEVOLUCION POR DEPOSITO EXCEDENTE"
+                ,NVL(G.CD, 0) AS "CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA"
             FROM
-                GARANTIAS G
-                LEFT JOIN CREDITOS C ON G.CREDITO = C.CREDITO AND C.RN = 1
-                LEFT JOIN GRUPOS GRP ON G.CREDITO = GRP.CREDITO
+                CREDITOS C
+                LEFT JOIN GRUPOS GRP ON GRP.CREDITO = C.CREDITO AND C.RN = 1
+                LEFT JOIN SALDO_INICIAL SI ON SI.CREDITO = C.CREDITO
+                LEFT JOIN GARANTIAS G ON G.CREDITO = C.CREDITO
             WHERE
-                G.TOTAL <> 0
-                AND NOT C.CREDITO IS NULL
+                NOT GRP.CREDITO  IS NULL
+                AND (NVL(SI.SDO_INI, 0) <> 0
+                OR G.MOVIMIENTOS <> 0)
         SQL;
 
-        $fini = $datos['fechaInicial'];
-        $ffin = $datos['fechaFinal'];
         $prm = [
-            'fini'  => $fini,
-            'ffin1' => $ffin,
-            'ffin2' => $ffin,
-            'ffin3' => $ffin,
-            'ffin4' => $ffin,
-            'ffin5' => $ffin,
-            'ffin6' => $ffin,
-            'ffin7' => $ffin,
-            'ffin8' => $ffin,
+            'fechaInicial'  => $datos['fechaInicial'],
+            'fechaFinal' => $datos['fechaFinal']
         ];
 
         try {

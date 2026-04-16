@@ -82,11 +82,7 @@
                             <th>Grupo</th>
                             <th>Situación</th>
                             <th>Saldo Inicial</th>
-                            <th>Depósito Banco</th>
-                            <th>Depósito Excedente</th>
-                            <th>Pago GL</th>
                             <th>Saldo Final</th>
-                            <th>Total</th>
                             <th>Pago Comisión</th>
                             <th>Dev. Cancelación de Cheque</th>
                             <th>Conciliación Comisión</th>
