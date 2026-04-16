@@ -146,6 +146,7 @@ class Menu
     {
         return [
             $this->enlace('Consulta por grupo', '/contabilidad/ConsultaGrupo', ['AMGM', 'AMOCA']),
+            $this->enlace('Reporte GL', '/contabilidad/ReporteGL', ['AMGM', 'AMOCA']),
         ];
     }
 
