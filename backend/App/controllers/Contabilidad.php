@@ -146,7 +146,8 @@ class Contabilidad extends Controller
                     "MOVIMIENTO CANCELADO",
                     "TRASPASO DE GARANTIA A PAGO",
                     "DEVOLUCION POR DEPOSITO EXCEDENTE",
-                    "CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA"
+                    "CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA",
+                    "DEVOLUCION"
                 ]
 
                 const formatoMoneda = (valor) => {
@@ -280,6 +281,7 @@ class Contabilidad extends Controller
             \PHPSpreadsheet::ColumnaExcel('TRASPASO DE GARANTIA A PAGO', 'Traspaso de Garantía a Pago', $moneda),
             \PHPSpreadsheet::ColumnaExcel('DEVOLUCION POR DEPOSITO EXCEDENTE', 'Devolución por Depósito Excedente', $moneda),
             \PHPSpreadsheet::ColumnaExcel('CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA', 'Cancelación de Cheque de Devolución de Garantía', $moneda),
+            \PHPSpreadsheet::ColumnaExcel('DEVOLUCION', 'Devolución', $moneda),
         ];
 
         $resultado = ContabilidadDao::GetReporteGL($datos);

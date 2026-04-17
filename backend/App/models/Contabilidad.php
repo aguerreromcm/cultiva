@@ -49,11 +49,11 @@ class Contabilidad extends Model
     /**
      * Reporte de análisis de garantías (Reporte GL).
      *
-     * Consulta EXACTAMENTE igual a garantias.sql. Las únicas modificaciones
-     * respecto al original son la sustitución de las fechas literales
-     * ('2026-01-01' y '2026-04-15') por bind parameters para permitir un
-     * rango de fechas configurable desde la UI. Se usan nombres únicos
-     * (:ffin1..:ffin8) porque PDO/OCI no permite repetir placeholders.
+     * La consulta calcula saldo inicial (PAG_GAR_SIM antes del rango),
+     * desglose de garantías por estatus dentro del rango y devoluciones
+     * (PRC con SITUACION = 'D'). Los placeholders repetidos del SQL original
+     * (:fechaInicial x3, :fechaFinal x2) se renombran a :fi1..:fi3 y
+     * :ff1..:ff2 porque PDO/OCI no permite reutilizar el mismo bind nombrado.
      *
      * @param array $datos ['fechaInicial' => 'YYYY-MM-DD', 'fechaFinal' => 'YYYY-MM-DD']
      */
@@ -65,33 +65,33 @@ class Contabilidad extends Model
                     CDGCLNS AS CREDITO
                     ,SUM(CANTIDAD) AS SDO_INI
                 FROM PAG_GAR_SIM
-                WHERE TRUNC(FPAGO) < TO_DATE(:fechaInicial, 'YYYY-MM-DD')
+                WHERE TRUNC(FPAGO) < TO_DATE(:fi1, 'YYYY-MM-DD')
                 GROUP BY CDGEM, CDGCLNS, CLNS
             )
             , GARANTIAS AS (
                 SELECT
-                    CDGCLNS AS CREDITO
-                    ,SUM(DECODE(ESTATUS, 'RE', CANTIDAD, 0)) AS RE
-                    ,SUM(DECODE(ESTATUS, 'DC', CANTIDAD, 0)) AS DC
-                    ,SUM(DECODE(ESTATUS, 'CO', CANTIDAD, 0)) AS CO
-                    ,SUM(DECODE(ESTATUS, 'DA', CANTIDAD, 0)) AS DA
-                    ,SUM(DECODE(ESTATUS, 'CP', CANTIDAD, 0)) AS CP
-                    ,SUM(DECODE(ESTATUS, 'CG', CANTIDAD, 0)) AS CG
-                    ,SUM(DECODE(ESTATUS, 'CR', CANTIDAD, 0)) AS CR
-                    ,SUM(DECODE(ESTATUS, 'CC', CANTIDAD, 0)) AS CC
-                    ,SUM(DECODE(ESTATUS, 'CI', CANTIDAD, 0)) AS CI
-                    ,SUM(DECODE(ESTATUS, 'CA', CANTIDAD, 0)) AS CA
-                    ,SUM(DECODE(ESTATUS, 'GP', CANTIDAD, 0)) AS GP
-                    ,SUM(DECODE(ESTATUS, 'DE', CANTIDAD, 0)) AS DE
-                    ,SUM(DECODE(ESTATUS, 'CD', CANTIDAD, 0)) AS CD
-                    ,SUM(CANTIDAD) AS TOTAL
+                    PGS.CDGCLNS AS CREDITO
+                    ,SUM(DECODE(PGS.ESTATUS, 'RE', PGS.CANTIDAD, 0)) AS RE
+                    ,SUM(DECODE(PGS.ESTATUS, 'DC', PGS.CANTIDAD, 0)) AS DC
+                    ,SUM(DECODE(PGS.ESTATUS, 'CO', PGS.CANTIDAD, 0)) AS CO
+                    ,SUM(DECODE(PGS.ESTATUS, 'DA', PGS.CANTIDAD, 0)) AS DA
+                    ,SUM(DECODE(PGS.ESTATUS, 'CP', PGS.CANTIDAD, 0)) AS CP
+                    ,SUM(DECODE(PGS.ESTATUS, 'CG', PGS.CANTIDAD, 0)) AS CG
+                    ,SUM(DECODE(PGS.ESTATUS, 'CR', PGS.CANTIDAD, 0)) AS CR
+                    ,SUM(DECODE(PGS.ESTATUS, 'CC', PGS.CANTIDAD, 0)) AS CC
+                    ,SUM(DECODE(PGS.ESTATUS, 'CI', PGS.CANTIDAD, 0)) AS CI
+                    ,SUM(DECODE(PGS.ESTATUS, 'CA', PGS.CANTIDAD, 0)) AS CA
+                    ,SUM(DECODE(PGS.ESTATUS, 'GP', PGS.CANTIDAD, 0)) AS GP
+                    ,SUM(DECODE(PGS.ESTATUS, 'DE', PGS.CANTIDAD, 0)) AS DE
+                    ,SUM(DECODE(PGS.ESTATUS, 'CD', PGS.CANTIDAD, 0)) AS CD
+                    ,SUM(PGS.CANTIDAD) AS TOTAL
                     ,COUNT(*) AS MOVIMIENTOS
-                FROM PAG_GAR_SIM
-                WHERE TRUNC(FPAGO) BETWEEN TO_DATE(:fechaInicial, 'YYYY-MM-DD') AND TO_DATE(:fechaFinal, 'YYYY-MM-DD')
-                GROUP BY CDGEM, CDGCLNS, CLNS
+                FROM PAG_GAR_SIM PGS
+                WHERE TRUNC(PGS.FPAGO) BETWEEN TO_DATE(:fi2, 'YYYY-MM-DD') AND TO_DATE(:ff1, 'YYYY-MM-DD')
+                GROUP BY PGS.CDGEM, PGS.CDGCLNS, PGS.CLNS
             )
             , CREDITOS AS (
-                SELECT 
+                SELECT
                     SN.CDGNS AS CREDITO
                     ,DECODE(NVL(PRN.SITUACION, SN.SITUACION), 'R', 'RECHAZADO', 'A', 'AUTORIZADO POR CARTERA', 'S', 'SOLICITADO', 'E', 'ENTREGADO', 'D', 'DEVUELTO', 'T', 'AUTORIZADO POR TESORERIA', 'L', 'LIQUIDADO', 'NO APLICA') AS SITUACION
                     ,ROW_NUMBER() OVER (PARTITION BY SN.CDGEM, SN.CDGNS ORDER BY SN.INICIO DESC, SN.SOLICITUD DESC) AS RN
@@ -110,6 +110,18 @@ class Contabilidad extends Model
                 FROM NS
                     LEFT JOIN CO ON CO.CODIGO = NS.CDGCO
                     LEFT JOIN RG ON RG.CODIGO = CO.CDGRG
+            )
+            , DEVOLUCIONES AS (
+                SELECT
+                    PRC.CDGNS AS CREDITO
+                    ,SUM(PRC.CANTAUTOR) AS DEVOLUCION
+                FROM
+                    PRC
+                WHERE
+                    PRC.SITUACION = 'D'
+                    AND TRUNC(PRC.ENTREGA) BETWEEN TO_DATE(:fi3, 'YYYY-MM-DD') AND TO_DATE(:ff2, 'YYYY-MM-DD')
+                GROUP BY
+                    PRC.CDGNS
             )
             SELECT
                 GRP.REGION
@@ -133,20 +145,24 @@ class Contabilidad extends Model
                 ,NVL(G.GP, 0) AS "TRASPASO DE GARANTIA A PAGO"
                 ,NVL(G.DE, 0) AS "DEVOLUCION POR DEPOSITO EXCEDENTE"
                 ,NVL(G.CD, 0) AS "CANCELACION DE CHEQUE DE DEVOLUCION DE GARANTIA"
+                ,NVL(D.DEVOLUCION, 0) AS DEVOLUCION
             FROM
                 CREDITOS C
                 LEFT JOIN GRUPOS GRP ON GRP.CREDITO = C.CREDITO AND C.RN = 1
                 LEFT JOIN SALDO_INICIAL SI ON SI.CREDITO = C.CREDITO
                 LEFT JOIN GARANTIAS G ON G.CREDITO = C.CREDITO
+                LEFT JOIN DEVOLUCIONES D ON D.CREDITO = C.CREDITO
             WHERE
-                NOT GRP.CREDITO  IS NULL
+                NOT GRP.CREDITO IS NULL
                 AND (NVL(SI.SDO_INI, 0) <> 0
                 OR G.MOVIMIENTOS <> 0)
         SQL;
 
+        $fini = $datos['fechaInicial'];
+        $ffin = $datos['fechaFinal'];
         $prm = [
-            'fechaInicial'  => $datos['fechaInicial'],
-            'fechaFinal' => $datos['fechaFinal']
+            'fi1' => $fini, 'fi2' => $fini, 'fi3' => $fini,
+            'ff1' => $ffin, 'ff2' => $ffin,
         ];
 
         try {

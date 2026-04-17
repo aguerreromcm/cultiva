@@ -96,6 +96,7 @@
                             <th>Traspaso de Garantía a Pago</th>
                             <th>Dev. por Depósito Excedente</th>
                             <th>Canc. Cheque Dev. Garantía</th>
+                            <th>Devolución</th>
                         </tr>
                     </thead>
                     <tbody>
