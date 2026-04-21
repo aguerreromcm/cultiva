@@ -35,7 +35,7 @@ class Contenedor extends Controller
                 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
                 <meta charset="utf-8">
                 
-                <link rel="shortcut icon" href="/img/logo_ico.png">
+                <link rel="shortcut icon" href="/img/logo_ico.svg">
                 <link rel="stylesheet" type="text/css" href="/css/nprogress.css">
                 <link rel="stylesheet" type="text/css" href="/css/loader.css">
                 <link rel="stylesheet" type="text/css" href="/css/tabla/sb-admin-2.css">
@@ -68,8 +68,8 @@ class Contenedor extends Controller
                         <div class="left_col scroll-view">
                             <div class="navbar nav_title">
                                 <a href="/Principal/" class="site_title" style="display: flex; align-items: center; justify-content: center; padding: 0; margin: 0;">
-                                    <img src="/img/logo_ico.png" alt="Inicio" width="50px" id="ico_home" style="display: none;">
-                                    <img src="/img/logo_nombre.png" alt="Login" width="210px" id="img_home">
+                                    <img src="/img/logo_ico.svg" alt="Inicio" width="50px" id="ico_home" style="display: none;">
+                                    <img src="/img/logo_nombre.svg" alt="Login" width="210px" id="img_home">
                                 </a>
                             </div>
                             <div class="clearfix"></div>
