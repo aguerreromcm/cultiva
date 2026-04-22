@@ -115,7 +115,7 @@ class Menu
     /** Opciones del submenú Tesorería */
     private function opcionesTesoreria()
     {
-        $permisos = ['AMGM', 'PLMV', 'LGFR', 'MCDP', 'GASC', 'MAJL', 'AFJJ', 'JCMG', 'JACJ', 'MACI'];
+        $permisos = ['AMGM', 'PLMV', 'LGFR', 'MCDP', 'GASC', 'MAJL', 'AFJJ', 'JCMG', 'JACJ', 'MACI', 'GOCD'];
         return [
             $this->enlace('Consulta Clientes Solicitudes', '/Tesoreria/', $permisos),
             $this->enlace('Reingresar Clientes a Grupo', '/Tesoreria/ReingresarClientesCredito/', $permisos),
@@ -153,10 +153,10 @@ class Menu
     /** Opciones del submenú Herramientas (visibilidad según config) */
     private function opcionesHerramientas()
     {
-        $permisos = ['AMGM', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
+        $permisos = ['AMGM'];
         return [
             $this->enlace('Rep Dia de Atraso', '/Herramientas/RepDiaAtraso/', $permisos),
-            $this->enlace('Auditoría Devengo', '/Herramientas/AuditoriaDevengo/', ['ADMIN', 'PLMV', 'PHEE']),
+            $this->enlace('Auditoría Devengo', '/Herramientas/AuditoriaDevengo/', $permisos),
         ];
     }
 

@@ -65,7 +65,7 @@ class Contabilidad extends Model
                     CDGCLNS AS CREDITO
                     ,SUM(CANTIDAD) AS SDO_INI
                 FROM PAG_GAR_SIM
-                WHERE TRUNC(FPAGO) < TO_DATE(:fi1, 'YYYY-MM-DD')
+                WHERE TRUNC(FPAGO) < TO_DATE(:fini, 'YYYY-MM-DD')
                 GROUP BY CDGEM, CDGCLNS, CLNS
             )
             , GARANTIAS AS (
@@ -87,7 +87,7 @@ class Contabilidad extends Model
                     ,SUM(PGS.CANTIDAD) AS TOTAL
                     ,COUNT(*) AS MOVIMIENTOS
                 FROM PAG_GAR_SIM PGS
-                WHERE TRUNC(PGS.FPAGO) BETWEEN TO_DATE(:fi2, 'YYYY-MM-DD') AND TO_DATE(:ff1, 'YYYY-MM-DD')
+                WHERE TRUNC(PGS.FPAGO) BETWEEN TO_DATE(:fini, 'YYYY-MM-DD') AND TO_DATE(:ffin, 'YYYY-MM-DD')
                 GROUP BY PGS.CDGEM, PGS.CDGCLNS, PGS.CLNS
             )
             , CREDITOS AS (
@@ -119,7 +119,7 @@ class Contabilidad extends Model
                     PRC
                 WHERE
                     PRC.SITUACION = 'D'
-                    AND TRUNC(PRC.ENTREGA) BETWEEN TO_DATE(:fi3, 'YYYY-MM-DD') AND TO_DATE(:ff2, 'YYYY-MM-DD')
+                    AND TRUNC(PRC.ENTREGA) BETWEEN TO_DATE(:fini, 'YYYY-MM-DD') AND TO_DATE(:ffin, 'YYYY-MM-DD')
                 GROUP BY
                     PRC.CDGNS
             )
@@ -158,11 +158,9 @@ class Contabilidad extends Model
                 OR G.MOVIMIENTOS <> 0)
         SQL;
 
-        $fini = $datos['fechaInicial'];
-        $ffin = $datos['fechaFinal'];
         $prm = [
-            'fi1' => $fini, 'fi2' => $fini, 'fi3' => $fini,
-            'ff1' => $ffin, 'ff2' => $ffin,
+            'fini' => $datos['fechaInicial'],
+            'ffin' => $datos['fechaFinal']
         ];
 
         try {
