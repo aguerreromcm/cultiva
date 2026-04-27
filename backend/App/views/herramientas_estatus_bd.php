@@ -32,12 +32,12 @@
                         </div>
 
                         <div class="estatus-block">
-                            <div class="estatus-block-titulo">Archive destination <span class="estatus-hint">(dest_id = 2)</span></div>
+                            <div class="estatus-block-titulo">Destino de archivado <span class="estatus-hint">(dest_id = 2)</span></div>
                             <div id="cultiva-archive-error" class="estatus-alert" style="display: none;" role="alert"></div>
                         </div>
 
                         <div class="estatus-block estatus-block-almacen">
-                            <div class="estatus-block-titulo">Recovery file destination</div>
+                            <div class="estatus-block-titulo">Destino de archivos de recuperación</div>
                             <div id="cultiva-rec-name" class="estatus-rec-nombre" title="Ruta de destino">--</div>
                             <div id="cultiva-rec-metricas" class="estatus-metricas-wrap" title="Límite, usado y espacio reutilizable">--</div>
                             <div id="cultiva-rec-error" class="estatus-alert" style="display: none;" role="alert"></div>
@@ -61,12 +61,12 @@
                         </div>
 
                         <div class="estatus-block">
-                            <div class="estatus-block-titulo">Archive destination <span class="estatus-hint">(dest_id = 2)</span></div>
+                            <div class="estatus-block-titulo">Destino de archivado <span class="estatus-hint">(dest_id = 2)</span></div>
                             <div id="mcm-archive-error" class="estatus-alert" style="display: none;" role="alert"></div>
                         </div>
 
                         <div class="estatus-block estatus-block-almacen">
-                            <div class="estatus-block-titulo">Recovery file destination</div>
+                            <div class="estatus-block-titulo">Destino de archivos de recuperación</div>
                             <div id="mcm-rec-name" class="estatus-rec-nombre" title="Ruta de destino">--</div>
                             <div id="mcm-rec-metricas" class="estatus-metricas-wrap" title="Límite, usado y espacio reutilizable">--</div>
                             <div id="mcm-rec-error" class="estatus-alert" style="display: none;" role="alert"></div>
