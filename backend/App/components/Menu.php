@@ -157,6 +157,7 @@ class Menu
         return [
             $this->enlace('Rep Dia de Atraso', '/Herramientas/RepDiaAtraso/', $permisos),
             $this->enlace('Auditoría Devengo', '/Herramientas/AuditoriaDevengo/', $permisos),
+            $this->enlace('Estatus BD', '/Herramientas/EstatusBD/', $permisos),
         ];
     }
 
