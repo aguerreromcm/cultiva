@@ -358,7 +358,7 @@ class Herramientas extends Controller
                     } else {
                         \$ico.html("\u2715");
                     }
-                    \$status.text(stUp === "VALID" ? "VALID" : stUp);
+                    \$status.text(stUp === "VALID" ? "Sincronizado" : stUp);
                     if (errorMsg) {
                         \$err.append(\$("<span class=\"estatus-alert-cuerpo\">").text(errorMsg));
                         \$err.show();
@@ -367,7 +367,6 @@ class Herramientas extends Controller
                 }
 
                 function pintaRecovery(prefix, info) {
-                    const \$name   = $("#" + prefix + "-rec-name");
                     const \$metric = $("#" + prefix + "-rec-metricas");
                     const \$pct    = $("#" + prefix + "-rec-pct");
                     const \$bar     = $("#" + prefix + "-rec-bar");
@@ -376,7 +375,6 @@ class Herramientas extends Controller
                     \$err.removeClass("estatus-alert--sql").hide().empty();
 
                     if (info.recovery_error) {
-                        \$name.text("\u2013");
                         const nd = "\u2013";
                         \$metric.html(
                             "<div class=\"estatus-metricas-grid estatus-metricas-grid--error\" role=\"group\">"
@@ -395,13 +393,11 @@ class Herramientas extends Controller
                         return null;
                     }
                     const r = info.recovery_file_dest || {};
-                    const name     = r.NAME || r.name || "\u2013";
                     const limite   = r.LIMITE_GB ?? r.limite_gb ?? null;
                     const usado    = r.USADO_GB ?? r.usado_gb ?? null;
                     const reusable = r.REUTILIZABLE_GB ?? r.reutilizable_gb ?? null;
                     const pct      = r.USADO_PCT ?? r.usado_pct ?? null;
 
-                    \$name.text(name);
                     const lim = limite === null || limite === "" ? "\u2013" : (String(limite) + " GB");
                     const u   = usado === null || usado === "" ? "\u2013" : (String(usado) + " GB");
                     const re  = reusable === null || reusable === "" ? "\u2013" : (String(reusable) + " GB");

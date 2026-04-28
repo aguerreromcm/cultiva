@@ -32,13 +32,10 @@
                         </div>
 
                         <div class="estatus-block">
-                            <div class="estatus-block-titulo">Destino de archivado <span class="estatus-hint">(dest_id = 2)</span></div>
                             <div id="cultiva-archive-error" class="estatus-alert" style="display: none;" role="alert"></div>
                         </div>
 
                         <div class="estatus-block estatus-block-almacen">
-                            <div class="estatus-block-titulo">Destino de archivos de recuperación</div>
-                            <div id="cultiva-rec-name" class="estatus-rec-nombre" title="Ruta de destino">--</div>
                             <div id="cultiva-rec-metricas" class="estatus-metricas-wrap" title="Límite, usado y espacio reutilizable">--</div>
                             <div id="cultiva-rec-error" class="estatus-alert" style="display: none;" role="alert"></div>
                             <div class="estatus-bar-row">
@@ -61,13 +58,10 @@
                         </div>
 
                         <div class="estatus-block">
-                            <div class="estatus-block-titulo">Destino de archivado <span class="estatus-hint">(dest_id = 2)</span></div>
                             <div id="mcm-archive-error" class="estatus-alert" style="display: none;" role="alert"></div>
                         </div>
 
                         <div class="estatus-block estatus-block-almacen">
-                            <div class="estatus-block-titulo">Destino de archivos de recuperación</div>
-                            <div id="mcm-rec-name" class="estatus-rec-nombre" title="Ruta de destino">--</div>
                             <div id="mcm-rec-metricas" class="estatus-metricas-wrap" title="Límite, usado y espacio reutilizable">--</div>
                             <div id="mcm-rec-error" class="estatus-alert" style="display: none;" role="alert"></div>
                             <div class="estatus-bar-row">
@@ -125,21 +119,25 @@
 .estatus-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 18px;
-    margin-top: 14px;
+    gap: 14px;
+    margin-top: 12px;
     align-items: stretch;
 }
 .estatus-card {
     display: flex;
     flex-direction: column;
-    min-height: 300px;
-    background: #fff;
+    min-height: 190px;
+    background: #ffffff;
     border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
     border-left: 6px solid #f0ad4e;
     padding: 0;
-    transition: border-color 0.25s ease, box-shadow 0.2s ease;
+    transition: border-color 0.25s ease, box-shadow 0.2s ease, transform 0.2s ease;
     overflow: hidden;
+}
+.estatus-card:hover {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+    transform: translateY(-1px);
 }
 .estatus-card.border-ok     { border-left-color: #28a745; }
 .estatus-card.border-warn   { border-left-color: #f0ad4e; }
@@ -147,7 +145,7 @@
 
 /* —— KPI: estado primero (VALID / …) —— */
 .estatus-card-kpi {
-    padding: 16px 18px 12px;
+    padding: 12px 16px 10px;
     background: linear-gradient(180deg, rgba(0,0,0,0.02) 0%, transparent 100%);
     border-bottom: 1px solid #eee;
 }
@@ -156,12 +154,12 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 48px;
-    margin-top: 6px;
+    min-height: 42px;
+    margin-top: 4px;
 }
-.estatus-kpi-ico { font-size: 28px; line-height: 1; user-select: none; flex-shrink: 0; }
+.estatus-kpi-ico { font-size: 24px; line-height: 1; user-select: none; flex-shrink: 0; }
 .estatus-kpi-text {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
     letter-spacing: 0.04em;
     line-height: 1.1;
@@ -176,6 +174,24 @@
 .estatus-kpi-main.estatus-warn .estatus-kpi-text { color: #b45309; }
 .estatus-kpi-main.estatus-error .estatus-kpi-ico,
 .estatus-kpi-main.estatus-error .estatus-kpi-text { color: #a71d2a; }
+.estatus-kpi-main.estatus-ok {
+    background: linear-gradient(180deg, rgba(25, 135, 84, 0.14) 0%, rgba(25, 135, 84, 0.05) 100%);
+    border: 1px solid rgba(25, 135, 84, 0.28);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+.estatus-kpi-main.estatus-warn {
+    background: linear-gradient(180deg, rgba(233, 160, 13, 0.16) 0%, rgba(233, 160, 13, 0.06) 100%);
+    border: 1px solid rgba(233, 160, 13, 0.30);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+.estatus-kpi-main.estatus-error {
+    background: linear-gradient(180deg, rgba(220, 53, 69, 0.14) 0%, rgba(220, 53, 69, 0.05) 100%);
+    border: 1px solid rgba(220, 53, 69, 0.30);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
 
 /* Badge legacy no usada en header principal; mantiene compat si añadimos clases al wrap */
 .estatus-kpi-main .estatus-badge { display: none; }
@@ -183,15 +199,17 @@
 /* —— Título DB —— */
 .estatus-card-titulo {
     display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: #6c757d;
+    font-size: 15px;
+    font-weight: 800;
+    color: #334155;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 0;
+    letter-spacing: 0.09em;
+    margin: 0 0 2px 0;
     text-align: center;
+    line-height: 1.2;
+    text-shadow: none;
 }
-.estatus-block { padding: 0 16px; margin-top: 0; }
+.estatus-block { padding: 0 14px; margin-top: 0; }
 .estatus-block + .estatus-block { border-top: 1px solid #eee; }
 .estatus-block-titulo {
     font-size: 11px;
@@ -202,34 +220,21 @@
     margin: 10px 0 6px;
 }
 .estatus-hint { font-weight: 500; text-transform: none; color: #8b99a5; }
-.estatus-block-almacen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.estatus-rec-nombre {
-    font-size: 12px;
-    color: #495057;
-    line-height: 1.35;
-    word-break: break-all;
-    margin-bottom: 6px;
-    max-height: 2.7em;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
+.estatus-block-almacen { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-top: 8px; }
 /* —— Almacenamiento: bloque de 3 métricas (misma data, lectura más rápida) —— */
 .estatus-metricas-wrap { margin-bottom: 10px; }
 .estatus-metricas-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: stretch;
-    border-radius: 8px;
+    border-radius: 7px;
     overflow: hidden;
     border: 1px solid #e2e8f0;
-    background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
 }
 .estatus-metrica {
-    padding: 10px 8px 12px;
+    padding: 8px 8px 10px;
     text-align: center;
     border-left: 1px solid #e2e8f0;
     min-width: 0;
@@ -242,12 +247,12 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #64748b;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     line-height: 1.2;
 }
 .estatus-metrica-val {
     display: block;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: #0f172a;
     font-variant-numeric: tabular-nums;
@@ -274,8 +279,8 @@
     gap: 8px;
     font-size: 11.5px;
     line-height: 1.35;
-    margin: 0 0 8px;
-    max-height: 3.1em;
+    margin: 6px 0 8px;
+    max-height: 4.1em;
     padding: 6px 8px 6px 6px;
     border-radius: 6px;
     word-break: break-word;
@@ -291,12 +296,12 @@
 .estatus-alert[style*="display: none"] { display: none !important; }
 
 /* —— Barra + % al lado (colores: &lt;85 / 85–90 / &gt;90) —— */
-.estatus-bar-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+.estatus-bar-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; }
 .estatus-bar-wrap {
     flex: 1;
     min-width: 0;
-    height: 12px;
-    background: #e9ecef;
+    height: 10px;
+    background: #e2e8f0;
     border-radius: 6px;
     overflow: hidden;
 }
@@ -308,18 +313,21 @@
 .estatus-bar.estatus-ok    { background: #28a745; }
 .estatus-bar.estatus-warn  { background: #e9a00d; }
 .estatus-bar.estatus-error { background: #dc3545; }
+.estatus-bar.estatus-ok    { box-shadow: 0 0 6px rgba(40, 167, 69, 0.35); }
+.estatus-bar.estatus-warn  { box-shadow: 0 0 6px rgba(233, 160, 13, 0.35); }
+.estatus-bar.estatus-error { box-shadow: 0 0 6px rgba(220, 53, 69, 0.35); }
 .estatus-bar-pct-label {
     flex-shrink: 0;
     min-width: 3.2em;
     text-align: right;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
-    color: #1a1a1a;
+    color: #0b1520;
     font-variant-numeric: tabular-nums;
 }
 
 /* —— Leyenda —— */
-.estatus-leyenda { margin: 16px 0 6px; display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 11px; color: #6b7280; }
+.estatus-leyenda { margin: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 10px; color: #6b7280; }
 .estatus-leyenda-item { display: inline-flex; align-items: center; gap: 6px; }
 .estatus-leyenda-cuadro { width: 12px; height: 12px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
 .estatus-leyenda-cuadro.estatus-ok    { background: #28a745; }
@@ -336,13 +344,16 @@
     }
     .estatus-actualizado-badge.is-live { border-color: #8b949e; color: #e6edf3; }
     .estatus-hr { border-color: #3d444d; }
-    .estatus-card { background: #2d333b; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+    .estatus-card { background: #2d333b; box-shadow: 0 2px 10px rgba(0,0,0,0.38); }
+    .estatus-card:hover { box-shadow: 0 7px 20px rgba(0,0,0,0.46); }
     .estatus-card-kpi { background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%); border-bottom-color: #3d444d; }
     .estatus-block + .estatus-block { border-color: #3d444d; }
-    .estatus-card-titulo { color: #8b949e; }
+    .estatus-card-titulo {
+        color: #d1d9e0;
+        text-shadow: none;
+    }
     .estatus-block-titulo { color: #9ca8b3; }
     .estatus-hint { color: #6e7a86; }
-    .estatus-rec-nombre { color: #c9d1d9; }
     .estatus-metricas-grid {
         border-color: #3d444d;
         background: linear-gradient(180deg, #2a3038 0%, #232a32 100%);
@@ -356,16 +367,47 @@
         border-color: #4a5568;
         background: #1a1f25;
     }
-    .estatus-bar-wrap { background: #1f2428; }
-    .estatus-bar-pct-label { color: #f0f6fc; }
+    .estatus-bar-wrap { background: #1a2027; border: 1px solid #2f3742; }
+    .estatus-bar-pct-label { color: #ffffff; font-weight: 800; }
     .estatus-leyenda { color: #8b949e; }
-    .estatus-kpi-main.estatus-ok  .estatus-kpi-text   { color: #7ee2a0; }
-    .estatus-kpi-main.estatus-ok  .estatus-kpi-ico   { color: #3dd67e; }
+    .estatus-kpi-main.estatus-ok  .estatus-kpi-text   { color: #86efac; }
+    .estatus-kpi-main.estatus-ok  .estatus-kpi-ico   { color: #4ade80; }
     .estatus-kpi-main.estatus-warn .estatus-kpi-text,
     .estatus-kpi-main.estatus-warn .estatus-kpi-ico  { color: #e9a00d; }
     .estatus-kpi-main.estatus-error .estatus-kpi-text,
-    .estatus-kpi-main.estatus-error .estatus-kpi-ico { color: #f85149; }
+    .estatus-kpi-main.estatus-error .estatus-kpi-ico { color: #ff6b6b; }
+    .estatus-kpi-main.estatus-ok {
+        background: linear-gradient(180deg, rgba(74, 222, 128, 0.16) 0%, rgba(74, 222, 128, 0.05) 100%);
+        border-color: rgba(74, 222, 128, 0.35);
+    }
+    .estatus-kpi-main.estatus-warn {
+        background: linear-gradient(180deg, rgba(233, 160, 13, 0.20) 0%, rgba(233, 160, 13, 0.06) 100%);
+        border-color: rgba(233, 160, 13, 0.35);
+    }
+    .estatus-kpi-main.estatus-error {
+        background: linear-gradient(180deg, rgba(255, 107, 107, 0.18) 0%, rgba(255, 107, 107, 0.06) 100%);
+        border-color: rgba(255, 107, 107, 0.38);
+    }
     .estatus-alert { color: #ffc9c0; background: #3a1c1c; border-color: #5a2a2a; }
+}
+
+@media (prefers-color-scheme: light) {
+    .estatus-page {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border-radius: 8px;
+    }
+    .estatus-kpi-main.estatus-ok {
+        background: linear-gradient(180deg, rgba(22, 163, 74, 0.12) 0%, rgba(22, 163, 74, 0.04) 100%);
+        border-color: rgba(22, 163, 74, 0.24);
+    }
+    .estatus-kpi-main.estatus-warn {
+        background: linear-gradient(180deg, rgba(202, 138, 4, 0.14) 0%, rgba(202, 138, 4, 0.05) 100%);
+        border-color: rgba(202, 138, 4, 0.24);
+    }
+    .estatus-kpi-main.estatus-error {
+        background: linear-gradient(180deg, rgba(220, 38, 38, 0.12) 0%, rgba(220, 38, 38, 0.04) 100%);
+        border-color: rgba(220, 38, 38, 0.26);
+    }
 }
 
 @media (max-width: 420px) {
