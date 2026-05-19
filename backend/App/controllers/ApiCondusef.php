@@ -229,7 +229,7 @@ class ApiCondusef extends Controller
                 
                 const registrarQueja =(e) => {
                     e.preventDefault()
-                    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJkYmE0MWMyZi1kNzBkLTQ4NmUtYjA0Yi0zZWYxMDc3YTNmNDciLCJ1c2VybmFtZSI6InN5c3RlbU1DTSIsImluc3RpdHVjaW9uaWQiOiJGOUNGMjUzMy03RjRDLTQ3RkYtOTIyNi04MEE4QjA3OCIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3IiOiJTT0NJRURBREVTIEZJTkFOQ0lFUkFTIERFIE9CSkVUTyBNVUxUSVBMRSBFTlIiLCJzeXN0ZW0iOiJSRURFQ08iLCJpYXQiOjE3MjQ5Njk4MDksImV4cCI6MTcyNzU2MTgwOX0.ucq78vBWQbWIlg-vP8EtDTZpHjAYtv8J04DgNmfPXKs"
+                    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiIwOGEwZjc3YS02YjIxLTRmODYtOGUyMC1lN2MwODhlMTk1OGIiLCJ1c2VybmFtZSI6IkN1bHRpdmFPQyIsImluc3RpdHVjaW9uaWQiOiJGOUNGMjUzMy03RjRDLTQ3RkYtOTIyNi04MEE4QjA3OCIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3IiOiJTT0NJRURBREVTIEZJTkFOQ0lFUkFTIERFIE9CSkVUTyBNVUxUSVBMRSBFTlIiLCJzeXN0ZW0iOiJSRURFQ08iLCJpYXQiOjE3NzkxNzk2NDQsImV4cCI6MTc4MTc3MTY0NH0.tNlM2Esrrsxipo9c3sd-qmI7jfpk0cKKAIrNx4b5xB4"
          
                     const datos = [{
                         "QuejasDenominacion": document.querySelector("#QuejasDenominacion").value,
@@ -368,7 +368,7 @@ class ApiCondusef extends Controller
     {
         $fecha = date('Y-m-d');
 
-        $extraFooter = <<<html
+        $extraFooter = <<<HTML
         <script>                                                
             const showError = (mensaje) => swal(mensaje, { icon: "error" })
             const showAviso = (mensaje) => swal(mensaje, { icon: "warning" })
@@ -525,7 +525,7 @@ class ApiCondusef extends Controller
             
             const registrarQueja = (e) => {
                 e.preventDefault()
-                const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJkYmE0MWMyZi1kNzBkLTQ4NmUtYjA0Yi0zZWYxMDc3YTNmNDciLCJ1c2VybmFtZSI6InN5c3RlbU1DTSIsImluc3RpdHVjaW9uaWQiOiJGOUNGMjUzMy03RjRDLTQ3RkYtOTIyNi04MEE4QjA3OCIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3IiOiJTT0NJRURBREVTIEZJTkFOQ0lFUkFTIERFIE9CSkVUTyBNVUxUSVBMRSBFTlIiLCJzeXN0ZW0iOiJSRURFQ08iLCJpYXQiOjE3MjQ5Njk4MDksImV4cCI6MTcyNzU2MTgwOX0.ucq78vBWQbWIlg-vP8EtDTZpHjAYtv8J04DgNmfPXKs"
+                const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJhcGlydWVuZS1jb25kdXNlZiIsInN1YiI6ImFwaXJldW5lLWNvbmR1c2VmIiwiZ3JvdXBzIjpbImFjY2VzcyJdLCJleHAiOjE3ODE4MDk0NTMzODQsInVpZCI6IjEwMmE5MzQwLWJjZmMtNDY5ZC1hMjZkLWFmZjAzNWNmMjVhNCIsInVzZXJuYW1lIjoiQ3VsdGl2YU9DIiwiaW5zdGl0dWNpb25pZCI6IjRkMTI3ODg1LWVlYjUtNDNhMi05NWFjLWQ4MzVjODIzN2JiZiIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3JpbnRzaXByZXMiOjY5LCJzZWN0b3JpbnRzaW8iOjI0LCJzZWN0b3IiOiJTb2NpZWRhZGVzIEZpbmFuY2llcmFzIGRlIE9iamV0byBNw7psdGlwbGUgRS5OLlIuIiwic2VjdG9yaW50bHljb24iOiIgTEFZT1VUQ09OU1VMMV9nZW5lcmFsIiwic2VjdG9yaW50bHlyZWMiOiJMQVlPVVRSRUNMQU0xX2dlbmVyYWwiLCJzZWN0b3JpbnRseWFjbCI6IkxBWU9VVEFDTEFSMSIsInN5c3RlbSI6IlJFVU5FIiwiaWF0IjoxNzc5MTc5NjUzLCJqdGkiOiI4NzliODg0My03MDQyLTQ4ODMtYjc3MC00Y2ZmN2EzZGIyMWMifQ.Afoq_TP2aFzvDM_XF49HcmivMOM9F2m2JLBg-oSC9I6HqYvckm28TTodWUfZ2peDzSqN70ohNQi7wbv_XuN6QfOJ07Muy1-Zs7iFTOwxpCQSc9CYmWkpfBpu0-ljgakfHUnNg2p0fbBXY7rHM1UYB-_0_mgIRMTcbRE6URaf4kvGx-A0F3dcA7OLH-xHSejD-FpDJLVNDf_OHuCYhLv6A4XC5ydj08N771ubfKURweOfKutO4LdbNu-zaohCZphyjUvXb1YJp1D4PYRoLZHIeqhZwzcrslh6Pt3JJvPNizNU-aMyITWpflWRXz_0WhjQU2_4dwzA-JtcCes3FNsxhA"
                 const datos = [{
                     InstitucionClave: document.querySelector("#InstitucionClave").value,
                     Sector: document.querySelector("#Sector").value,
@@ -563,7 +563,7 @@ class ApiCondusef extends Controller
                 consumeAPI("https://api-reune-pruebas.condusef.gob.mx/reune/consultas/general", procesaRespuesta, datos, "json", "post", token, "Ocurrió un error de comunicación con el portal de REUNE.", procesaError)   
             }
         </script>
-        html;
+        HTML;
 
         $trimestres = [
             "1" => "Enero - Marzo",
