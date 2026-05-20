@@ -491,6 +491,42 @@ class ApiCondusef extends Controller
                 elemento.selectedIndex = 0
                 elemento.disabled = !(opciones.length > 1)
             }
+
+            const URL_REUNE_PRODUCTOS = "/ApiCondusef/GetReuneProductos/"
+            const URL_REUNE_CAUSAS = "/ApiCondusef/GetReuneCausas/"
+
+            const cargarProductosReune = () => {
+                $.getJSON(URL_REUNE_PRODUCTOS, (data) => {
+                    const producto = document.querySelector("#Producto")
+                    const opciones = data.map((p) =>
+                        "<option value='" + p.codigo_producto + "' data-id='" + p.id + "'>" + p.nombre_corto + "</option>"
+                    )
+                    insertaOpciones(producto, opciones)
+                }).fail(() => showError("No se pudo cargar el catálogo de productos REUNE."))
+            }
+
+            const cargarCausasReune = () => {
+                const producto = document.querySelector("#Producto")
+                const causa = document.querySelector("#CausaId")
+                const productoId = producto.selectedOptions[0]?.dataset?.id
+
+                if (!productoId) {
+                    insertaOpciones(causa, [])
+                    return validaRequeridos()
+                }
+
+                $.getJSON(URL_REUNE_CAUSAS + "?producto_id=" + productoId, (data) => {
+                    const opciones = data.map((c) =>
+                        "<option value='" + c.codigo_causa + "'>" + c.descripcion + "</option>"
+                    )
+                    insertaOpciones(causa, opciones)
+                    validaRequeridos()
+                }).fail(() => showError("No se pudo cargar el catálogo de causas REUNE."))
+            }
+
+            const cambioProductoReune = () => {
+                cargarCausasReune()
+            }
          
             const validaRequeridos = () => {
                 const requeridos = [
@@ -548,7 +584,7 @@ class ApiCondusef extends Controller
                 }]
                     
                 const procesaRespuesta = (respuesta) => {
-                    return showSuccess("Queja registrada exitosamente con el folio: " + document.querySelector("#QuejasFolio").value)
+                    return showSuccess("Queja registrada exitosamente con el folio: " + document.querySelector("#ConsultasFolio").value)
                 }
 
                 const procesaError = (respuesta) => {
@@ -562,6 +598,8 @@ class ApiCondusef extends Controller
 
                 consumeAPI("https://api-reune-pruebas.condusef.gob.mx/reune/consultas/general", procesaRespuesta, datos, "json", "post", token, "Ocurrió un error de comunicación con el portal de REUNE.", procesaError)   
             }
+
+            cargarProductosReune()
         </script>
         HTML;
 
@@ -600,25 +638,40 @@ class ApiCondusef extends Controller
             $opcionesMedios .= "<option value='{$key}'>{$value}</option>";
         }
 
-        $productos = ApiCondusefDao::GetProductos();
-        $opcionesProductos = "<option value='' disabled selected>Seleccionar</option>";
-        foreach ($productos as $key => $value) {
-            $opcionesProductos .= "<option value='{$value['CODIGO']}'>{$value['PRODUCTO']}</option>";
-        }
-
-        $causas = ApiCondusefDao::GetCausas();
-        $opcionesCausas = "<option value='' disabled selected>Seleccionar</option>";
-        foreach ($causas as $key => $value) {
-            $opcionesCausas .= "<option value='{$value['CODIGO']}'>{$value['DESCRIPCION']}</option>";
-        }
-
         View::set('header', $this->_contenedor->header(self::GetExtraHeader("Registrar Quejas REUNE")));
         View::set('footer', $this->_contenedor->footer($extraFooter));
         View::set('fecha', $fecha);
         View::set('meses', $opcionesMeses);
         View::set('medios', $opcionesMedios);
-        View::set('productos', $opcionesProductos);
-        View::set('causas', $opcionesCausas);
         View::render("z_api_agregar_quejas_REUNE");
+    }
+
+    /**
+     * Catálogo de productos REUNE (activos). Ruta: /ApiCondusef/GetReuneProductos/
+     */
+    public function GetReuneProductos()
+    {
+        header('Content-Type: application/json; charset=UTF-8');
+        try {
+            echo json_encode(ApiCondusefDao::GetReuneProductos());
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Causas REUNE por producto. Ruta: /ApiCondusef/GetReuneCausas/?producto_id={id}
+     */
+    public function GetReuneCausas()
+    {
+        header('Content-Type: application/json; charset=UTF-8');
+        try {
+            $productoId = $_GET['producto_id'] ?? 0;
+            echo json_encode(ApiCondusefDao::GetReuneCausas($productoId));
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
     }
 }

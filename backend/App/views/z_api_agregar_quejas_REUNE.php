@@ -88,16 +88,16 @@ $spnMensaje = "<span class='text-danger' id='spnMensaje'>" . $mensaje . "</span>
                     <div class="col-md-3">
                         <div class="form-group">
                             <label for="Producto">Producto o servicio *</label>
-                            <select class="form-control" id="Producto" onchange=validaRequeridos()>
-                                <?= $productos; ?>
+                            <select class="form-control" id="Producto" onchange="cambioProductoReune()">
+                                <option value="" disabled selected>Seleccionar</option>
                             </select>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="form-group">
                             <label for="CausaId">Causa de la queja *</label>
-                            <select class="form-control" id="CausaId" onchange=validaRequeridos()>
-                                <?= $causas; ?>
+                            <select class="form-control" id="CausaId" onchange=validaRequeridos() disabled>
+                                <option value="" disabled selected>Seleccionar</option>
                             </select>
                         </div>
                     </div>
