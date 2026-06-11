@@ -17,13 +17,15 @@ class ApiCondusef extends Model
                 ,RP.NOMBRE_CORTO
                 ,RC.CODIGO_CAUSA
                 ,RC.DESCRIPCION
+                ,RC.CONSULTA
+                ,RC.RECLAMACION
+                ,RC.ACLARACION 
             FROM
                 REUNE_CAUSAS RC
                 LEFT JOIN REUNE_PRODUCTOS RP ON RP.ID = RC.PRODUCTO_ID
             WHERE
                 RP.ACTIVO = 1
                 AND RC.ACTIVO = 1
-                AND RC.RECLAMACION = 1
             ORDER BY
                 RP.NOMBRE_CORTO,
                 RC.DESCRIPCION
@@ -45,7 +47,10 @@ class ApiCondusef extends Model
 
                 $causas[$codProd][] = [
                     'valor' => $row['CODIGO_CAUSA'],
-                    'texto' => $row['DESCRIPCION']
+                    'texto' => $row['DESCRIPCION'],
+                    'consulta' => $row['CONSULTA'],
+                    'reclamacion' => $row['RECLAMACION'],
+                    'aclaracion' => $row['ACLARACION']
                 ];
             }
 

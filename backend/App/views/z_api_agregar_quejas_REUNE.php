@@ -10,6 +10,11 @@
         </div>
         <div class="col-md-12" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
             <div class="form-group">
+                <label for="NumConsultas">Número de reclamaciones</label>
+                <input class="form-control" id="NumConsultas" value="1" disabled />
+                <span class="text-danger" id="spnMensaje">Este valor es fijo, no se puede modificar</span>
+            </div>
+            <div class="form-group">
                 <label for="InstitucionClave">Institución</label>
                 <input class="form-control" id="InstitucionClave" value="Financiera Cultiva, S.A.P.I. de C.V., SOFOM, E.N.R." disabled />
                 <span class="text-danger" id="spnMensaje">Este valor es fijo, no se puede modificar</span>
@@ -30,11 +35,6 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="NumConsultas">Número de reclamaciones</label>
-                <input class="form-control" id="NumConsultas" value="1" disabled />
-                <span class="text-danger" id="spnMensaje">Este valor es fijo, no se puede modificar</span>
-            </div>
-            <div class="form-group">
                 <label for="ConsultasFolio">Número de folio *</label>
                 <input class="form-control" id="ConsultasFolio" oninput=validaRequeridos() />
             </div>
@@ -47,51 +47,13 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="ConsultasFecRecepcion">Fecha de la reclamación *</label>
+                <input type="date" class="form-control" id="ConsultasFecRecepcion" oninput=validaRequeridos() />
+            </div>
+            <div class="form-group">
                 <label for="ConsultasFecAten">Fecha de atención</label>
                 <input type="date" class="form-control" id="ConsultasFecAten" disabled oninput=validaRequeridos() />
                 <span class="text-danger" id="spnMensaje">Aplica solo con estatus CONCLUIDO</span>
-            </div>
-            <div class="form-group">
-                <label for="EstadosId">Estado *</label>
-                <select class="form-control" id="EstadosId" onchange=validaRequeridos()>
-                    <option value="" disabled selected>Seleccione un estado</option>
-                    <option value="1">Aguascalientes</option>
-                    <option value="2">Baja California</option>
-                    <option value="3">Baja California Sur</option>
-                    <option value="4">Campeche</option>
-                    <option value="5">Coahuila</option>
-                    <option value="6">Colima</option>
-                    <option value="7">Chiapas</option>
-                    <option value="8">Chihuahua</option>
-                    <option value="9">Ciudad de México</option>
-                    <option value="10">Durango</option>
-                    <option value="11">Guanajuato</option>
-                    <option value="12">Guerrero</option>
-                    <option value="13">Hidalgo</option>
-                    <option value="14">Jalisco</option>
-                    <option value="15">México</option>
-                    <option value="16">Michoacán</option>
-                    <option value="17">Morelos</option>
-                    <option value="18">Nayarit</option>
-                    <option value="19">Nuevo León</option>
-                    <option value="20">Oaxaca</option>
-                    <option value="21">Puebla</option>
-                    <option value="22">Querétaro</option>
-                    <option value="23">Quintana Roo</option>
-                    <option value="24">San Luis Potosí</option>
-                    <option value="25">Sinaloa</option>
-                    <option value="26">Sonora</option>
-                    <option value="27">Tabasco</option>
-                    <option value="28">Tamaulipas</option>
-                    <option value="29">Tlaxcala</option>
-                    <option value="30">Veracruz</option>
-                    <option value="31">Yucatán</option>
-                    <option value="32">Zacatecas</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="ConsultasFecRecepcion">Fecha de la reclamación *</label>
-                <input type="date" class="form-control" id="ConsultasFecRecepcion" oninput=validaRequeridos() />
             </div>
             <div class="form-group">
                 <label for="MediosId">Medio de recepción *</label>
@@ -121,9 +83,56 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="tipoRegistro">Tipo de registro *</label>
+                <select class="form-control" id="tipoRegistro" onchange=cambioTipoRegistro() disabled>
+                    <option value="" disabled selected>Seleccione un producto</option>
+                    <option value="1">Consulta</option>
+                    <option value="2">Reclamación</option>
+                    <option value="3">Aclaración</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="CausaId">Causa de la reclamación *</label>
                 <select class="form-control" id="CausaId" onchange=validaRequeridos() disabled>
-                    <option value="" disabled selected>Seleccione un producto</option>
+                    <option value="" disabled selected>Seleccione un tipo de registro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="EstadosId">Estado *</label>
+                <select class="form-control" id="EstadosId" onchange=validaRequeridos()>
+                    <option value="">Seleccione un estado</option>
+                    <option value="1">Aguascalientes</option>
+                    <option value="2">Baja California</option>
+                    <option value="3">Baja California Sur</option>
+                    <option value="4">Campeche</option>
+                    <option value="5">Coahuila</option>
+                    <option value="6">Colima</option>
+                    <option value="7">Chiapas</option>
+                    <option value="8">Chihuahua</option>
+                    <option value="9" selected>Ciudad de México</option>
+                    <option value="10">Durango</option>
+                    <option value="11">Guanajuato</option>
+                    <option value="12">Guerrero</option>
+                    <option value="13">Hidalgo</option>
+                    <option value="14">Jalisco</option>
+                    <option value="15">México</option>
+                    <option value="16">Michoacán</option>
+                    <option value="17">Morelos</option>
+                    <option value="18">Nayarit</option>
+                    <option value="19">Nuevo León</option>
+                    <option value="20">Oaxaca</option>
+                    <option value="21">Puebla</option>
+                    <option value="22">Querétaro</option>
+                    <option value="23">Quintana Roo</option>
+                    <option value="24">San Luis Potosí</option>
+                    <option value="25">Sinaloa</option>
+                    <option value="26">Sonora</option>
+                    <option value="27">Tabasco</option>
+                    <option value="28">Tamaulipas</option>
+                    <option value="29">Tlaxcala</option>
+                    <option value="30">Veracruz</option>
+                    <option value="31">Yucatán</option>
+                    <option value="32">Zacatecas</option>
                 </select>
             </div>
             <div class="form-group">
@@ -150,16 +159,15 @@
             <div class="form-group">
                 <label for="ConsultasMpioId">Municipio *</label>
                 <select class="form-control" id="ConsultasMpioId" onchange=validaRequeridos() disabled>
-                    <option value="" disabled selected>Buscar un CP</option>
+                    <option value="03103" disabled selected>Benito Juárez</option>
                 </select>
-                <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="ConsultasLocId">Tipo de localidad</label>
                 <select class="form-control" id="ConsultasLocId" onchange=validaRequeridos() disabled></select>
                 <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
                 <label for="ConsultasColId">Colonia</label>
                 <select class="form-control" id="ConsultasColId" onchange=validaRequeridos() disabled></select>
                 <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>

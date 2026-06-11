@@ -504,18 +504,42 @@ class ApiCondusef extends Controller
 
             const cambioProducto = () => {
                 const producto = $("#Producto").val()
+                const tipoRegistro = $("#tipoRegistro")
+                tipoRegistro.prop("disabled", producto === "")
+
+                if (producto === "") return tipoRegistro.find("option:selected").text("Seleccione un producto")
+                
+                tipoRegistro.find("option:selected").text("Seleccione")
+                tipoRegistro.selectedIndex = 0
+                filtraCausas()
+            }
+
+            const cambioTipoRegistro = () => {
+                const tipoRegistro = $("#tipoRegistro").val()
+                const CausaId = $("#CausaId")
+                CausaId.prop("disabled", tipoRegistro === "")
+
+                if (tipoRegistro === "") return CausaId.find("option:selected").text("Seleccione un tipo de registro");
+                
+                CausaId.find("option:selected").text("Seleccione")
+                CausaId.selectedIndex = 0
+                filtraCausas()
+            }
+
+            const filtraCausas = () => {
+                const producto = $("#Producto").val()
+                const tipoRegistro = $("#tipoRegistro").val()
                 const causaSelect = $("#CausaId")
 
-                if (producto === "") {
-                    causaSelect.html("<option value='' disabled selected>Seleccione un producto</option>")
-                    causaSelect.prop("disabled", true)
-                    return
-                }
-
                 const causasProducto = causas[producto] || []
-                const opcionesCausas = causasProducto.map(causa => "<option value=" + causa.valor + ">" + causa.texto + "</option>")
+                const opcionesCausas = causasProducto.map(causa => {
+                    if (tipoRegistro == 1 && causa.consulta != 1) return ""
+                    if (tipoRegistro == 2 && causa.reclamacion != 1) return ""
+                    if (tipoRegistro == 3 && causa.aclaracion != 1) return ""
+                    return "<option value=" + causa.valor + ">" + causa.texto + "</option>"
+                })
+
                 causaSelect.html("<option value='' disabled selected>Seleccione</option>" + opcionesCausas.join(""))
-                causaSelect.prop("disabled", false)
 
                 validaRequeridos()
             }
