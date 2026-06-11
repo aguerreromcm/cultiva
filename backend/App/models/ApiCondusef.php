@@ -5,120 +5,53 @@ namespace App\models;
 defined("APPPATH") or die("Access denied");
 
 use Core\Database;
+use Core\Model;
 
-class ApiCondusef
+class ApiCondusef extends Model
 {
     public static function GetProductos()
     {
-        $query = <<<sql
+        $qry = <<<SQL
             SELECT
-                CODIGO,
-                SUBPRODUCTO as producto
+                RP.CODIGO_PRODUCTO
+                ,RP.NOMBRE_CORTO
+                ,RC.CODIGO_CAUSA
+                ,RC.DESCRIPCION
             FROM
-                CAT_PROD_SERV_RED
-        sql;
-
-        $db = new Database();
-        if ($db->db_activa == null) return [];
-        $resultado =  $db->queryAll($query);
-        if ($resultado == null) return [];
-        return $resultado;
-    }
-
-    public static function GetCausas()
-    {
-        $query = <<<sql
-            SELECT
-                CODIGO,
-                DESCRIPCION
-            FROM
-                CAT_CAUSA_QUEJA_RED
-        sql;
-
-        $db = new Database();
-        if ($db->db_activa == null) return [];
-        $resultado =  $db->queryAll($query);
-        if ($resultado == null) return [];
-        return $resultado;
-    }
-
-    public static function GetReuneProductos()
-    {
-        $query = <<<sql
-            SELECT
-                ID,
-                NOMBRE_CORTO,
-                CODIGO_PRODUCTO
-            FROM
-                REUNE_PRODUCTOS
+                REUNE_CAUSAS RC
+                LEFT JOIN REUNE_PRODUCTOS RP ON RP.ID = RC.PRODUCTO_ID
             WHERE
-                ACTIVO = 1
+                RP.ACTIVO = 1
+                AND RC.ACTIVO = 1
+                AND RC.RECLAMACION = 1
             ORDER BY
-                NOMBRE_CORTO
-        sql;
+                RP.NOMBRE_CORTO,
+                RC.DESCRIPCION
+        SQL;
 
-        $db = new Database();
-        if ($db->db_activa == null) {
-            return [];
+        try {
+            $db = new Database();
+            $res = $db->queryAll($qry);
+
+            $productos = [];
+            $causas    = [];
+
+            foreach ($res as $row) {
+                $codProd = $row['CODIGO_PRODUCTO'];
+
+                if (!isset($productos[$codProd])) {
+                    $productos[$codProd] = $row['NOMBRE_CORTO'];
+                }
+
+                $causas[$codProd][] = [
+                    'valor' => $row['CODIGO_CAUSA'],
+                    'texto' => $row['DESCRIPCION']
+                ];
+            }
+
+            return self::Responde(true, "Consulta exitosa", ['productos' => $productos, 'causas' => $causas]);
+        } catch (\Exception $e) {
+            return self::Responde(false, "Error al obtener las causas de reclamación: ", null, $e->getMessage());
         }
-
-        $resultado = $db->queryAll($query);
-        if ($resultado == null) {
-            return [];
-        }
-
-        return array_map(static function ($row) {
-            return [
-                'id' => (int) $row['ID'],
-                'nombre_corto' => $row['NOMBRE_CORTO'],
-                'codigo_producto' => $row['CODIGO_PRODUCTO'],
-            ];
-        }, $resultado);
-    }
-
-    public static function GetReuneCausas($productoId)
-    {
-        $productoId = (int) $productoId;
-        if ($productoId <= 0) {
-            return [];
-        }
-
-        $query = <<<sql
-            SELECT
-                ID,
-                DESCRIPCION,
-                CODIGO_CAUSA,
-                CONSULTA,
-                RECLAMACION,
-                ACLARACION
-            FROM
-                REUNE_CAUSAS
-            WHERE
-                PRODUCTO_ID = :producto_id
-                AND ACTIVO = 1
-            ORDER BY
-                DESCRIPCION
-        sql;
-
-        $db = new Database();
-        if ($db->db_activa == null) {
-            return [];
-        }
-
-        $resultado = $db->queryAll($query, ['producto_id' => $productoId]);
-        if ($resultado == null) {
-            return [];
-        }
-
-        return array_map(static function ($row) {
-            return [
-                'id' => (int) $row['ID'],
-                'descripcion' => $row['DESCRIPCION'],
-                'codigo_causa' => $row['CODIGO_CAUSA'],
-                'consulta' => (int) $row['CONSULTA'],
-                'reclamacion' => (int) $row['RECLAMACION'],
-                'aclaracion' => (int) $row['ACLARACION'],
-            ];
-        }, $resultado);
     }
 }

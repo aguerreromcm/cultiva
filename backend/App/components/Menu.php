@@ -98,7 +98,7 @@ class Menu
         $permisos = ['AMGM', 'GASC', 'GBNA', 'LMVH'];
         return [
             $this->enlace('Registrar Quejas REDECO', '/ApiCondusef/AddRedeco/', $permisos),
-            $this->enlace('Registrar Quejas REUNE', '/ApiCondusef/AddReune/', $permisos),
+            $this->enlace('Registrar Reclamación REUNE', '/ApiCondusef/AddReune/', $permisos),
         ];
     }
 

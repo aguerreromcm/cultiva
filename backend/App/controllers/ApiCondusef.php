@@ -178,7 +178,7 @@ class ApiCondusef extends Controller
                 const insertaOpciones = (elemento, opciones = []) => {
                     if (opciones.length > 1) opciones.unshift("<option value='' disabled>Seleccione</option>")
                     
-                    elemento.innerHTML = opciones.join("")
+                    elemento.html(opciones.join(""))
                     elemento.selectedIndex = 0
                     elemento.disabled = !(opciones.length > 1)
                 }
@@ -366,26 +366,30 @@ class ApiCondusef extends Controller
 
     public function AddReune()
     {
-        $fecha = date('Y-m-d');
-
         $extraFooter = <<<HTML
         <script>                                                
-            const showError = (mensaje) => swal(mensaje, { icon: "error" })
-            const showAviso = (mensaje) => swal(mensaje, { icon: "warning" })
-            const showSuccess = (mensaje) => swal(mensaje, { icon: "success" , showConfirmButton: true,}).then((result) => {location.reload();} )
+            {$this->mensajes}
         
+            const formatoFecha = (fecha) => {
+                return Temporal.PlainDate.from(fecha).toLocaleString('es-MX', {
+                            day:   '2-digit',
+                            month: '2-digit',
+                            year:  'numeric'
+                        })
+            }
+
             const consumeAPI = (url, callback, datos = null, tipoDatos = 'json', tipo = "get", token = null, msgError = "", fncERR = null) => {
                 $.ajax({
                     type: tipo,
                     url: url,
                     dataType: tipoDatos,
-                    data: JSON.stringify(datos),
+                    data: datos ? JSON.stringify(datos) : null,
                     contentType: "application/json",
                     success: callback,
                     error: (resError) => {
-                        console.log(resError.responseJSON)
+                        console.log(resError)
                         if (fncERR) fncERR(resError.responseJSON)
-                        else showError(msgError)
+                        else showError(msgError || "Ocurrió un error de comunicación con el servidor.")
                     },
                     headers: { "Authorization": token }
                 })
@@ -393,14 +397,8 @@ class ApiCondusef extends Controller
                 
             const limpiaCampos = (mensaje = "") => {
                 if (mensaje !== "") showError(mensaje)
-                document.querySelector("#EstadosId").innerHTML = ""
-                document.querySelector("#EstadosId").disabled = true
-                document.querySelector("#ConsultasMpioId").innerHTML = ""
-                document.querySelector("#ConsultasMpioId").disabled = true
-                document.querySelector("#ConsultasLocId").innerHTML = ""
-                document.querySelector("#ConsultasLocId").disabled = true
-                document.querySelector("#ConsultasColId").innerHTML = ""
-                document.querySelector("#ConsultasColId").disabled = true
+                $("#EstadosId", "#ConsultasMpioId", "#ConsultasLocId", "#ConsultasColId").html()
+                $("#EstadosId", "#ConsultasMpioId", "#ConsultasLocId", "#ConsultasColId").disabled = true
             }
                 
             const soloNumeros = (e) => {
@@ -419,26 +417,20 @@ class ApiCondusef extends Controller
                 if (e.keyCode < 48 || e.keyCode > 57) return e.preventDefault()
             }
                 
-            const formatoFecha = (fecha) => {
-                const [anio, mes, dia] = fecha.split("-")
-                return dia + "/" + mes + "/" + anio
-            }
-                
             const validaFechaRecepcion = () => {
-                const fechaRegistro = document.querySelector("#ConsultasFecRecepcion").value
-                const mesRegistro = document.querySelector("#ConsultasTrim").value
+                const fechaRegistro = $("#ConsultasFecRecepcion").val()
+                const mesRegistro = $("#ConsultasTrim").val()
                 const [anio, mes, dia] = fechaRegistro.split("-")
                     
                 if (parseInt(mes) != parseInt(mesRegistro)) {
-                    document.querySelector("#ConsultasFecRecepcion").value = "$fecha"
+                    $("#ConsultasFecRecepcion").val() = Temporal.Now.plainDateISO().toString()
                     return showAviso("El mes de registro no coincide con la fecha de recepción, favor de validar.")
                 }
             }
                 
             const validaCP = () => {
-                const cp = document.querySelector("#ConsultasCP").value
+                const cp = $("#ConsultasCP").val()
                 if (cp.length !== 5) return limpiaCampos("El código postal debe ser de 5 dígitos.")
-                
                 const url = "https://api.condusef.gob.mx/sepomex/colonias/?cp=" + cp
                 
                 consumeAPI(url, (data) => {
@@ -452,7 +444,7 @@ class ApiCondusef extends Controller
             }
                 
             const validaEstado = (edo) => {
-                const estado = document.querySelector("#EstadosId")
+                const estado = $("#EstadosId")
                 const estados = getOpciones(edo, "estadoId", "estado")
                 insertaOpciones(estado, estados)
             }
@@ -487,104 +479,134 @@ class ApiCondusef extends Controller
             const insertaOpciones = (elemento, opciones = []) => {
                 if (opciones.length > 1) opciones.unshift("<option value='' disabled>Seleccione</option>")
                 
-                elemento.innerHTML = opciones.join("")
+                elemento.html(opciones.join(""))
                 elemento.selectedIndex = 0
-                elemento.disabled = !(opciones.length > 1)
+                elemento.prop("disabled", !(opciones.length > 1))
             }
 
-            const URL_REUNE_PRODUCTOS = "/ApiCondusef/GetReuneProductos/"
-            const URL_REUNE_CAUSAS = "/ApiCondusef/GetReuneCausas/"
+            const cambioEstatus = () => {
+                const noEstatus = $("#ConsultasEstatusCon").val()
 
-            const cargarProductosReune = () => {
-                $.getJSON(URL_REUNE_PRODUCTOS, (data) => {
-                    const producto = document.querySelector("#Producto")
-                    const opciones = data.map((p) =>
-                        "<option value='" + p.codigo_producto + "' data-id='" + p.id + "'>" + p.nombre_corto + "</option>"
-                    )
-                    insertaOpciones(producto, opciones)
-                }).fail(() => showError("No se pudo cargar el catálogo de productos REUNE."))
+                const ConsultascatnivelatenId = $("#ConsultascatnivelatenId")
+                const ConsultasFecAten = $("#ConsultasFecAten")
+
+                if (noEstatus == 2) {
+                    ConsultascatnivelatenId.prop("disabled", false)
+                    ConsultasFecAten.prop("disabled", false)
+                } else {
+                    ConsultascatnivelatenId.prop("disabled", true)
+                    ConsultasFecAten.prop("disabled", true)
+                }
+                
+                ConsultascatnivelatenId.selectedIndex = 0
+                ConsultasFecAten.val(Temporal.Now.plainDateISO().toString())
             }
 
-            const cargarCausasReune = () => {
-                const producto = document.querySelector("#Producto")
-                const causa = document.querySelector("#CausaId")
-                const productoId = producto.selectedOptions[0]?.dataset?.id
+            const cambioProducto = () => {
+                const producto = $("#Producto").val()
+                const causaSelect = $("#CausaId")
 
-                if (!productoId) {
-                    insertaOpciones(causa, [])
-                    return validaRequeridos()
+                if (producto === "") {
+                    causaSelect.html("<option value='' disabled selected>Seleccione un producto</option>")
+                    causaSelect.prop("disabled", true)
+                    return
                 }
 
-                $.getJSON(URL_REUNE_CAUSAS + "?producto_id=" + productoId, (data) => {
-                    const opciones = data.map((c) =>
-                        "<option value='" + c.codigo_causa + "'>" + c.descripcion + "</option>"
-                    )
-                    insertaOpciones(causa, opciones)
-                    validaRequeridos()
-                }).fail(() => showError("No se pudo cargar el catálogo de causas REUNE."))
-            }
+                const causasProducto = causas[producto] || []
+                const opcionesCausas = causasProducto.map(causa => "<option value=" + causa.valor + ">" + causa.texto + "</option>")
+                causaSelect.html("<option value='' disabled selected>Seleccione</option>" + opcionesCausas.join(""))
+                causaSelect.prop("disabled", false)
 
-            const cambioProductoReune = () => {
-                cargarCausasReune()
+                validaRequeridos()
             }
          
             const validaRequeridos = () => {
                 const requeridos = [
                     "#ConsultasTrim",
                     "#ConsultasFolio",
-                    // "#ConsultasEstatusCon",
                     "#ConsultasFecRecepcion",
                     "#EstadosId",
-                    // "#ConsultasFecAten",
                     "#MediosId",
                     "#Producto",
                     "#CausaId",
-                    "#ConsultasCP",
                     "#ConsultasMpioId",
-                    "#ConsultasLocId",
-                    "#ConsultasColId",
-                    // "#ConsultascatnivelatenId",
                     "#ConsultasPori",
                 ]
-            
-                const elementos = document.querySelectorAll(requeridos.join(","))
+
+                const noEstatus = $("#ConsultasEstatusCon").val()
+                if (noEstatus == 2) {
+                    requeridos.push("#ConsultasFecAten")
+                    requeridos.push("#ConsultascatnivelatenId")
+                    
+                    const ConsultasFecAten = Temporal.PlainDate.from($("#ConsultasFecAten").val())
+                    const ConsultasFecRecepcion = Temporal.PlainDate.from($("#ConsultasFecRecepcion").val())
+                    const comparacion = Temporal.PlainDate.compare(ConsultasFecAten, ConsultasFecRecepcion);
+
+                    if (comparacion < 0) {
+                        $("#btnAgregar").prop("disabled", true)
+                        showError("La fecha de atención no puede ser anterior a la fecha de reclamación.")
+                        return
+                    }
+                }
+
+                const medioRecepcion = $("#MediosId").value
+                if ([3,5,17].includes(Number(medioRecepcion))) {
+                    requeridos.push("#ConsultasCP")
+                    requeridos.push("#ConsultasLocId")
+                    requeridos.push("#ConsultasColId")
+                }
+
                 let validacion = false
             
-                elementos.forEach((elemento) => {
-                    if (elemento.value === "" || elemento.value === "Seleccione") {
+                requeridos.forEach((requerido) => {
+                    const elemento = $(requerido)
+                    if (elemento.val() === "" || elemento.val() === "Seleccione") {
                         validacion = true
                     }
                 })
             
-                document.querySelector("#btnAgregar").disabled = validacion
+                $("#btnAgregar").prop("disabled", validacion)
             }
             
             const registrarQueja = (e) => {
                 e.preventDefault()
                 const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJhcGlydWVuZS1jb25kdXNlZiIsInN1YiI6ImFwaXJldW5lLWNvbmR1c2VmIiwiZ3JvdXBzIjpbImFjY2VzcyJdLCJleHAiOjE3ODE4MDk0NTMzODQsInVpZCI6IjEwMmE5MzQwLWJjZmMtNDY5ZC1hMjZkLWFmZjAzNWNmMjVhNCIsInVzZXJuYW1lIjoiQ3VsdGl2YU9DIiwiaW5zdGl0dWNpb25pZCI6IjRkMTI3ODg1LWVlYjUtNDNhMi05NWFjLWQ4MzVjODIzN2JiZiIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3JpbnRzaXByZXMiOjY5LCJzZWN0b3JpbnRzaW8iOjI0LCJzZWN0b3IiOiJTb2NpZWRhZGVzIEZpbmFuY2llcmFzIGRlIE9iamV0byBNw7psdGlwbGUgRS5OLlIuIiwic2VjdG9yaW50bHljb24iOiIgTEFZT1VUQ09OU1VMMV9nZW5lcmFsIiwic2VjdG9yaW50bHlyZWMiOiJMQVlPVVRSRUNMQU0xX2dlbmVyYWwiLCJzZWN0b3JpbnRseWFjbCI6IkxBWU9VVEFDTEFSMSIsInN5c3RlbSI6IlJFVU5FIiwiaWF0IjoxNzc5MTc5NjUzLCJqdGkiOiI4NzliODg0My03MDQyLTQ4ODMtYjc3MC00Y2ZmN2EzZGIyMWMifQ.Afoq_TP2aFzvDM_XF49HcmivMOM9F2m2JLBg-oSC9I6HqYvckm28TTodWUfZ2peDzSqN70ohNQi7wbv_XuN6QfOJ07Muy1-Zs7iFTOwxpCQSc9CYmWkpfBpu0-ljgakfHUnNg2p0fbBXY7rHM1UYB-_0_mgIRMTcbRE6URaf4kvGx-A0F3dcA7OLH-xHSejD-FpDJLVNDf_OHuCYhLv6A4XC5ydj08N771ubfKURweOfKutO4LdbNu-zaohCZphyjUvXb1YJp1D4PYRoLZHIeqhZwzcrslh6Pt3JJvPNizNU-aMyITWpflWRXz_0WhjQU2_4dwzA-JtcCes3FNsxhA"
                 const datos = [{
-                    InstitucionClave: document.querySelector("#InstitucionClave").value,
-                    Sector: document.querySelector("#Sector").value,
-                    ConsultasTrim: Number(document.querySelector("#ConsultasTrim").value),
-                    NumConsultas: Number(document.querySelector("#NumConsultas").value),
-                    ConsultasFolio: document.querySelector("#ConsultasFolio").value,
-                    ConsultasEstatusCon: Number(document.querySelector("#ConsultasEstatusCon").value),
+                    InstitucionClave: $("#InstitucionClave").val(),
+                    Sector: $("#Sector").val(),
+                    ConsultasTrim: Number($("#ConsultasTrim").val()),
+                    NumConsultas: Number($("#NumConsultas").val()),
+                    ConsultasFolio: $("#ConsultasFolio").val(),
+                    ConsultasEstatusCon: Number($("#ConsultasEstatusCon").val()),
                     ConsultasFecAten: null,
-                    EstadosId: Number(document.querySelector("#EstadosId").value),
-                    ConsultasFecRecepcion: formatoFecha(document.querySelector("#ConsultasFecRecepcion").value),
-                    MediosId: Number(document.querySelector("#MediosId").value),
-                    Producto: document.querySelector("#Producto").value,
-                    CausaId: document.querySelector("#CausaId").value,
-                    ConsultasCP: Number(document.querySelector("#ConsultasCP").value),
-                    ConsultasMpioId: Number(document.querySelector("#ConsultasMpioId").value),
-                    ConsultasLocId: Number(document.querySelector("#ConsultasLocId").value),
-                    ConsultasColId: Number(document.querySelector("#ConsultasColId").value),
+                    EstadosId: Number($("#EstadosId").val()),
+                    ConsultasFecRecepcion: formatoFecha($("#ConsultasFecRecepcion").val()),
+                    MediosId: Number($("#MediosId").val()),
+                    Producto: $("#Producto").val(),
+                    CausaId: $("#CausaId").val(),
+                    ConsultasCP: null,
+                    ConsultasMpioId: Number($("#ConsultasMpioId").val()),
+                    ConsultasLocId: null,
+                    ConsultasColId: null,
                     ConsultascatnivelatenId: null,
-                    ConsultasPori: document.querySelector("#ConsultasPori").value,
+                    ConsultasPori: $("#ConsultasPori").val(),
                 }]
+
+                const noEstatus = $("#ConsultasEstatusCon").val()
+                if (noEstatus == 2) {
+                    datos[0].ConsultasFecAten = formatoFecha($("#ConsultasFecAten").val())
+                    datos[0].ConsultascatnivelatenId = Number($("#ConsultascatnivelatenId").val())
+                }
+
+                const medioRecepcion = $("#MediosId").val()
+                if ([3,5,17].includes(Number(medioRecepcion))) {
+                    datos[0].ConsultasCP = Number($("#ConsultasCP").val())
+                    datos[0].ConsultasLocId = Number($("#ConsultasLocId").val())
+                    datos[0].ConsultasColId = Number($("#ConsultasColId").val())
+                }
                     
                 const procesaRespuesta = (respuesta) => {
-                    return showSuccess("Queja registrada exitosamente con el folio: " + document.querySelector("#ConsultasFolio").value)
+                    return showSuccess("Queja registrada exitosamente con el folio: " + $("#ConsultasFolio").val())
                 }
 
                 const procesaError = (respuesta) => {
@@ -599,7 +621,13 @@ class ApiCondusef extends Controller
                 consumeAPI("https://api-reune-pruebas.condusef.gob.mx/reune/consultas/general", procesaRespuesta, datos, "json", "post", token, "Ocurrió un error de comunicación con el portal de REUNE.", procesaError)   
             }
 
-            cargarProductosReune()
+            $(document).ready(() => {
+                const hoy = Temporal.Now.plainDateISO().toString()
+                $("#ConsultasFecRecepcion").val(hoy)
+                $("#ConsultasFecRecepcion").attr("max", hoy)
+                $("#ConsultasFecAten").val(hoy)
+                $("#ConsultasFecAten").attr("max", hoy)
+            })
         </script>
         HTML;
 
@@ -616,62 +644,21 @@ class ApiCondusef extends Controller
             else $opcionesMeses .= "<option value='{$key}'>{$value}</option>";
         }
 
-        $medios = [
-            "1" => "Correo electrónico",
-            "2" => "Página de internet",
-            "3" => "Sucursales",
-            "4" => "Teléfono",
-            "5" => "UNE",
-            "6" => "CONDUSEF-SIGE gestión electrónica",
-            "7" => "CONDUSEF-Gestión ordinaria",
-            "8" => "Mensajeria",
-            "9" => "Fax",
-            "17" => "Oficinas de atención",
-            "18" => "Centro de atención telefónica",
-            "20" => "Aplicación movil",
-            "21" => "Interfaces",
-            "22" => "Api's",
-            "23" => "Bots"
-        ];
-        $opcionesMedios = "<option value='' disabled selected>Seleccionar</option>";
-        foreach ($medios as $key => $value) {
-            $opcionesMedios .= "<option value='{$key}'>{$value}</option>";
+        $producto_causa = ApiCondusefDao::GetProductos();
+
+        $opcionesProductos = "<option value='' disabled selected>Seleccionar</option>";
+        if ($producto_causa['success']) {
+            $causas = $producto_causa['datos']['causas'];
+            foreach ($producto_causa['datos']['productos'] as $codProd => $nombre) {
+                $opcionesProductos .= "<option value='{$codProd}'>{$nombre}</option>";
+            }
         }
 
         View::set('header', $this->_contenedor->header(self::GetExtraHeader("Registrar Quejas REUNE")));
         View::set('footer', $this->_contenedor->footer($extraFooter));
-        View::set('fecha', $fecha);
         View::set('meses', $opcionesMeses);
-        View::set('medios', $opcionesMedios);
+        View::set('productos', $opcionesProductos);
+        View::set('causas', $causas);
         View::render("z_api_agregar_quejas_REUNE");
-    }
-
-    /**
-     * Catálogo de productos REUNE (activos). Ruta: /ApiCondusef/GetReuneProductos/
-     */
-    public function GetReuneProductos()
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        try {
-            echo json_encode(ApiCondusefDao::GetReuneProductos());
-        } catch (\Throwable $e) {
-            http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Causas REUNE por producto. Ruta: /ApiCondusef/GetReuneCausas/?producto_id={id}
-     */
-    public function GetReuneCausas()
-    {
-        header('Content-Type: application/json; charset=UTF-8');
-        try {
-            $productoId = $_GET['producto_id'] ?? 0;
-            echo json_encode(ApiCondusefDao::GetReuneCausas($productoId));
-        } catch (\Throwable $e) {
-            http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
     }
 }
