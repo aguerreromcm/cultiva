@@ -57,7 +57,7 @@
             </div>
             <div class="form-group">
                 <label for="MediosId">Medio de recepción *</label>
-                <select class="form-control" id="MediosId" onchange=validaRequeridos()>
+                <select class="form-control" id="MediosId" onchange=cambioMedio()>
                     <option value="" disabled="" selected="">Seleccionar</option>
                     <option value="1">Correo electrónico</option>
                     <option value="2">Página de internet</option>
@@ -98,58 +98,21 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="EstadosId">Estado *</label>
-                <select class="form-control" id="EstadosId" onchange=validaRequeridos()>
-                    <option value="">Seleccione un estado</option>
-                    <option value="1">Aguascalientes</option>
-                    <option value="2">Baja California</option>
-                    <option value="3">Baja California Sur</option>
-                    <option value="4">Campeche</option>
-                    <option value="5">Coahuila</option>
-                    <option value="6">Colima</option>
-                    <option value="7">Chiapas</option>
-                    <option value="8">Chihuahua</option>
-                    <option value="9" selected>Ciudad de México</option>
-                    <option value="10">Durango</option>
-                    <option value="11">Guanajuato</option>
-                    <option value="12">Guerrero</option>
-                    <option value="13">Hidalgo</option>
-                    <option value="14">Jalisco</option>
-                    <option value="15">México</option>
-                    <option value="16">Michoacán</option>
-                    <option value="17">Morelos</option>
-                    <option value="18">Nayarit</option>
-                    <option value="19">Nuevo León</option>
-                    <option value="20">Oaxaca</option>
-                    <option value="21">Puebla</option>
-                    <option value="22">Querétaro</option>
-                    <option value="23">Quintana Roo</option>
-                    <option value="24">San Luis Potosí</option>
-                    <option value="25">Sinaloa</option>
-                    <option value="26">Sonora</option>
-                    <option value="27">Tabasco</option>
-                    <option value="28">Tamaulipas</option>
-                    <option value="29">Tlaxcala</option>
-                    <option value="30">Veracruz</option>
-                    <option value="31">Yucatán</option>
-                    <option value="32">Zacatecas</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="ConsultasCP">CP *</label>
+                <label for="ConsultasCP">CP</label>
 
                 <div class="input-group">
                     <input class="form-control"
                         id="ConsultasCP"
                         maxlength="5"
                         onkeypress="validaEntradaCP(event)"
-                        oninput="validaRequeridos()" />
+                        disabled />
 
                     <span class="input-group-btn">
                         <button class="btn btn-primary"
                             type="button"
                             onclick="validaCP()"
-                            id="btnCP">
+                            id="btnCP"
+                            disabled>
                             <i class="fa fa-search"></i>
                         </button>
                     </span>
@@ -157,20 +120,16 @@
                 <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>
             </div>
             <div class="form-group">
-                <label for="ConsultasMpioId">Municipio *</label>
-                <select class="form-control" id="ConsultasMpioId" onchange=validaRequeridos() disabled>
-                    <option value="03103" disabled selected>Benito Juárez</option>
+                <label for="EstadosId">Estado</label>
+                <select class="form-control" id="EstadosId" onchange=validaRequeridos() disabled>
+                    <option value="9" selected>Ciudad de México</option>
                 </select>
             </div>
-            <div class="form-group" style="display: none;">
-                <label for="ConsultasLocId">Tipo de localidad</label>
-                <select class="form-control" id="ConsultasLocId" onchange=validaRequeridos() disabled></select>
-                <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>
-            </div>
-            <div class="form-group" style="display: none;">
-                <label for="ConsultasColId">Colonia</label>
-                <select class="form-control" id="ConsultasColId" onchange=validaRequeridos() disabled></select>
-                <span class="text-danger" id="spnMensaje">Solo si el medio de recepción es UNE, Sucursal u Oficina</span>
+            <div class="form-group">
+                <label for="ConsultasMpioId">Municipio *</label>
+                <select class="form-control" id="ConsultasMpioId" onchange=validaRequeridos() disabled>
+                    <option value="14" selected>Benito Juárez</option>
+                </select>
             </div>
             <div class="form-group">
                 <label for="ConsultascatnivelatenId">Nivel de atención o contacto</label>

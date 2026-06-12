@@ -369,6 +369,7 @@ class ApiCondusef extends Controller
         $extraFooter = <<<HTML
         <script>                                                
             {$this->mensajes}
+            const mediosConCP = [3, 5, 17]
         
             const formatoFecha = (fecha) => {
                 return Temporal.PlainDate.from(fecha).toLocaleString('es-MX', {
@@ -379,14 +380,19 @@ class ApiCondusef extends Controller
             }
 
             const consumeAPI = (url, callback, datos = null, tipoDatos = 'json', tipo = "get", token = null, msgError = "", fncERR = null) => {
+                showWait("Procesando...")
                 $.ajax({
                     type: tipo,
                     url: url,
                     dataType: tipoDatos,
                     data: datos ? JSON.stringify(datos) : null,
                     contentType: "application/json",
-                    success: callback,
+                    success: () => {
+                        swal.close()
+                        if (callback) callback()
+                    },
                     error: (resError) => {
+                        swal.close()
                         console.log(resError)
                         if (fncERR) fncERR(resError.responseJSON)
                         else showError(msgError || "Ocurrió un error de comunicación con el servidor.")
@@ -395,10 +401,11 @@ class ApiCondusef extends Controller
                 })
             }
                 
-            const limpiaCampos = (mensaje = "") => {
+            const limpiaCamposCP = (mensaje = "") => {
                 if (mensaje !== "") showError(mensaje)
-                $("#EstadosId", "#ConsultasMpioId", "#ConsultasLocId", "#ConsultasColId").html()
-                $("#EstadosId", "#ConsultasMpioId", "#ConsultasLocId", "#ConsultasColId").disabled = true
+                $("#btnCP").find("i").removeClass("fa-trash").addClass("fa-search")
+                $("#EstadosId").html('<option value="9" selected>Ciudad de México</option>')
+                $("#ConsultasMpioId").html('<option value="14" selected>Benito Juárez</option>')
             }
                 
             const soloNumeros = (e) => {
@@ -429,17 +436,25 @@ class ApiCondusef extends Controller
             }
                 
             const validaCP = () => {
+                if ($("#btnCP").find("i").hasClass("fa-trash")) {
+                    $("#ConsultasCP").val("")
+                    $("#ConsultasCP").prop("disabled", false)
+                    return limpiaCamposCP()
+                }
+
                 const cp = $("#ConsultasCP").val()
-                if (cp.length !== 5) return limpiaCampos("El código postal debe ser de 5 dígitos.")
+                if (cp.length !== 5) return limpiaCamposCP("El código postal debe ser de 5 dígitos.")
+
                 const url = "https://api.condusef.gob.mx/sepomex/colonias/?cp=" + cp
                 
                 consumeAPI(url, (data) => {
-                    if (data.colonias.length === 0) return limpiaCampos("Código postal no encontrado.")
+                    if (data.colonias.length === 0) return limpiaCamposCP("Código postal no encontrado.")
                     
                     validaEstado(data.colonias)
                     validaMunicipio(data.colonias)
-                    validaLocalidad(data.colonias)
-                    validaColonia(data.colonias)
+                    $("#ConsultasCP").prop("disabled", true)
+                    $("#btnCP").find("i").removeClass("fa-search").addClass("fa-trash")
+                    validaRequeridos()
                 })
             }
                 
@@ -450,21 +465,9 @@ class ApiCondusef extends Controller
             }
                 
             const validaMunicipio = (mun) => {
-                const municipio = document.querySelector("#ConsultasMpioId")
+                const municipio = $("#ConsultasMpioId")
                 const municipios = getOpciones(mun, "municipioId", "municipio")
                 insertaOpciones(municipio, municipios)
-            }
-                
-            const validaLocalidad = (loc) => {
-                const localidad = document.querySelector("#ConsultasLocId")
-                const localidades = getOpciones(loc, "tipoLocalidadId", "tipoLocalidad")
-                insertaOpciones(localidad, localidades)
-            }
-                
-            const validaColonia = (col) => {
-                const colonia = document.querySelector("#ConsultasColId")
-                const colonias = getOpciones(col, "coloniaId", "colonia")
-                insertaOpciones(colonia, colonias)
             }
                 
             const getOpciones = (elementos, key, value) => {
@@ -500,6 +503,24 @@ class ApiCondusef extends Controller
                 
                 ConsultascatnivelatenId.selectedIndex = 0
                 ConsultasFecAten.val(Temporal.Now.plainDateISO().toString())
+            }
+
+            const cambioMedio = () => {
+                const medioRecepcion = $("#MediosId").val()
+                const ConsultasCP = $("#ConsultasCP")
+                const btnCP = $("#btnCP")
+
+                $("#btnCP").find("i").removeClass("fa-trash").addClass("fa-search")
+
+                if ([3, 5, 17].includes(Number(medioRecepcion))) {
+                    ConsultasCP.prop("disabled", false)
+                    btnCP.prop("disabled", false)
+                } else {
+                    ConsultasCP.prop("disabled", true)
+                    ConsultasCP.val("")
+                    btnCP.prop("disabled", true)
+                    limpiaCamposCP()
+                }
             }
 
             const cambioProducto = () => {
@@ -538,7 +559,7 @@ class ApiCondusef extends Controller
                     if (tipoRegistro == 3 && causa.aclaracion != 1) return ""
                     return "<option value=" + causa.valor + ">" + causa.texto + "</option>"
                 })
-
+                
                 causaSelect.html("<option value='' disabled selected>Seleccione</option>" + opcionesCausas.join(""))
 
                 validaRequeridos()
@@ -559,9 +580,6 @@ class ApiCondusef extends Controller
 
                 const noEstatus = $("#ConsultasEstatusCon").val()
                 if (noEstatus == 2) {
-                    requeridos.push("#ConsultasFecAten")
-                    requeridos.push("#ConsultascatnivelatenId")
-                    
                     const ConsultasFecAten = Temporal.PlainDate.from($("#ConsultasFecAten").val())
                     const ConsultasFecRecepcion = Temporal.PlainDate.from($("#ConsultasFecRecepcion").val())
                     const comparacion = Temporal.PlainDate.compare(ConsultasFecAten, ConsultasFecRecepcion);
@@ -571,22 +589,26 @@ class ApiCondusef extends Controller
                         showError("La fecha de atención no puede ser anterior a la fecha de reclamación.")
                         return
                     }
+
+                    requeridos.push("#ConsultasFecAten")
+                    requeridos.push("#ConsultascatnivelatenId")
                 }
 
-                const medioRecepcion = $("#MediosId").value
-                if ([3,5,17].includes(Number(medioRecepcion))) {
+                const medioRecepcion = $("#MediosId").val()
+                if (mediosConCP.includes(Number(medioRecepcion))) {
                     requeridos.push("#ConsultasCP")
-                    requeridos.push("#ConsultasLocId")
-                    requeridos.push("#ConsultasColId")
                 }
 
                 let validacion = false
             
                 requeridos.forEach((requerido) => {
                     const elemento = $(requerido)
-                    if (elemento.val() === "" || elemento.val() === "Seleccione") {
-                        validacion = true
-                    }
+                    let valor = ""
+
+                    if (elemento.is("select")) valor = elemento.find("option:selected").val()
+                    else valor = elemento.val()
+                    
+                    if (valor === "") validacion = true
                 })
             
                 $("#btnAgregar").prop("disabled", validacion)
@@ -595,42 +617,41 @@ class ApiCondusef extends Controller
             const registrarQueja = (e) => {
                 e.preventDefault()
                 const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJhcGlydWVuZS1jb25kdXNlZiIsInN1YiI6ImFwaXJldW5lLWNvbmR1c2VmIiwiZ3JvdXBzIjpbImFjY2VzcyJdLCJleHAiOjE3ODE4MDk0NTMzODQsInVpZCI6IjEwMmE5MzQwLWJjZmMtNDY5ZC1hMjZkLWFmZjAzNWNmMjVhNCIsInVzZXJuYW1lIjoiQ3VsdGl2YU9DIiwiaW5zdGl0dWNpb25pZCI6IjRkMTI3ODg1LWVlYjUtNDNhMi05NWFjLWQ4MzVjODIzN2JiZiIsImluc3RpdHVjaW9uQ2xhdmUiOjE1NDk0LCJkZW5vbWluYWNpb25fc29jaWFsIjoiRmluYW5jaWVyYSBDdWx0aXZhLCBTLkEuUC5JLiBkZSBDLlYuLCBTT0ZPTSwgRS5OLlIuIiwic2VjdG9yaWQiOjY5LCJzZWN0b3JpbnRzaXByZXMiOjY5LCJzZWN0b3JpbnRzaW8iOjI0LCJzZWN0b3IiOiJTb2NpZWRhZGVzIEZpbmFuY2llcmFzIGRlIE9iamV0byBNw7psdGlwbGUgRS5OLlIuIiwic2VjdG9yaW50bHljb24iOiIgTEFZT1VUQ09OU1VMMV9nZW5lcmFsIiwic2VjdG9yaW50bHlyZWMiOiJMQVlPVVRSRUNMQU0xX2dlbmVyYWwiLCJzZWN0b3JpbnRseWFjbCI6IkxBWU9VVEFDTEFSMSIsInN5c3RlbSI6IlJFVU5FIiwiaWF0IjoxNzc5MTc5NjUzLCJqdGkiOiI4NzliODg0My03MDQyLTQ4ODMtYjc3MC00Y2ZmN2EzZGIyMWMifQ.Afoq_TP2aFzvDM_XF49HcmivMOM9F2m2JLBg-oSC9I6HqYvckm28TTodWUfZ2peDzSqN70ohNQi7wbv_XuN6QfOJ07Muy1-Zs7iFTOwxpCQSc9CYmWkpfBpu0-ljgakfHUnNg2p0fbBXY7rHM1UYB-_0_mgIRMTcbRE6URaf4kvGx-A0F3dcA7OLH-xHSejD-FpDJLVNDf_OHuCYhLv6A4XC5ydj08N771ubfKURweOfKutO4LdbNu-zaohCZphyjUvXb1YJp1D4PYRoLZHIeqhZwzcrslh6Pt3JJvPNizNU-aMyITWpflWRXz_0WhjQU2_4dwzA-JtcCes3FNsxhA"
+                const noEstatus = Number($("#ConsultasEstatusCon").find("option:selected").val())
+                const noMedio = Number($("#MediosId").find("option:selected").val())
                 const datos = [{
                     InstitucionClave: $("#InstitucionClave").val(),
                     Sector: $("#Sector").val(),
-                    ConsultasTrim: Number($("#ConsultasTrim").val()),
+                    ConsultasTrim: Number($("#ConsultasTrim").find("option:selected").val()),
                     NumConsultas: Number($("#NumConsultas").val()),
                     ConsultasFolio: $("#ConsultasFolio").val(),
-                    ConsultasEstatusCon: Number($("#ConsultasEstatusCon").val()),
+                    ConsultasEstatusCon: noEstatus,
                     ConsultasFecAten: null,
-                    EstadosId: Number($("#EstadosId").val()),
+                    EstadosId: Number($("#EstadosId").find("option:selected").val()),
                     ConsultasFecRecepcion: formatoFecha($("#ConsultasFecRecepcion").val()),
-                    MediosId: Number($("#MediosId").val()),
-                    Producto: $("#Producto").val(),
-                    CausaId: $("#CausaId").val(),
+                    MediosId: noMedio,
+                    Producto: $("#Producto").find("option:selected").val(),
+                    CausaId: $("#CausaId").find("option:selected").val(),
                     ConsultasCP: null,
-                    ConsultasMpioId: Number($("#ConsultasMpioId").val()),
+                    ConsultasMpioId: Number($("#ConsultasMpioId").find("option:selected").val()),
                     ConsultasLocId: null,
                     ConsultasColId: null,
                     ConsultascatnivelatenId: null,
-                    ConsultasPori: $("#ConsultasPori").val(),
+                    ConsultasPori: $("#ConsultasPori").find("option:selected").val(),
                 }]
-
-                const noEstatus = $("#ConsultasEstatusCon").val()
+                
                 if (noEstatus == 2) {
                     datos[0].ConsultasFecAten = formatoFecha($("#ConsultasFecAten").val())
-                    datos[0].ConsultascatnivelatenId = Number($("#ConsultascatnivelatenId").val())
+                    datos[0].ConsultascatnivelatenId = Number($("#ConsultascatnivelatenId").find("option:selected").val())
                 }
 
-                const medioRecepcion = $("#MediosId").val()
-                if ([3,5,17].includes(Number(medioRecepcion))) {
+                if (mediosConCP.includes(noMedio)) {
                     datos[0].ConsultasCP = Number($("#ConsultasCP").val())
-                    datos[0].ConsultasLocId = Number($("#ConsultasLocId").val())
-                    datos[0].ConsultasColId = Number($("#ConsultasColId").val())
                 }
                     
                 const procesaRespuesta = (respuesta) => {
                     return showSuccess("Queja registrada exitosamente con el folio: " + $("#ConsultasFolio").val())
+                        .then(() => location.reload())
                 }
 
                 const procesaError = (respuesta) => {
