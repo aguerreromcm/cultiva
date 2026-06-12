@@ -9,7 +9,45 @@ use Core\Model;
 
 class ApiCondusef extends Model
 {
-    public static function GetProductos()
+    public static function GetProductosREDECO()
+    {
+        $query = <<<sql
+            SELECT
+                CODIGO,
+                SUBPRODUCTO as producto
+            FROM
+                CAT_PROD_SERV_RED
+        sql;
+
+        try {
+            $db = new Database();
+            $resultado =  $db->queryAll($query);
+            return self::Responde(true, "Consulta exitosa", $resultado);
+        } catch (\Exception $e) {
+            return self::Responde(false, "Error al obtener las causas de reclamación: ", null, $e->getMessage());
+        }
+    }
+
+    public static function GetCausasREDECO()
+    {
+        $query = <<<sql
+            SELECT
+                CODIGO,
+                DESCRIPCION
+            FROM
+                CAT_CAUSA_QUEJA_RED
+        sql;
+
+        try {
+            $db = new Database();
+            $resultado =  $db->queryAll($query);
+            return self::Responde(true, "Consulta exitosa", $resultado);
+        } catch (\Exception $e) {
+            return self::Responde(false, "Error al obtener las causas de reclamación: ", null, $e->getMessage());
+        }
+    }
+
+    public static function GetProductosREUNE()
     {
         $qry = <<<SQL
             SELECT

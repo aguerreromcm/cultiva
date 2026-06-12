@@ -99,18 +99,24 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="form-group">
                             <label for="QuejasCP">CP *</label>
-                            <input class="form-control" id="QuejasCP" maxlength="5" onkeypress="validaEntradaCP(event)" />
-                        </div>
-                    </div>
-                    <div class="col-md-1">
-                        <div class="form-group">
-                            <label for="tbnCP">Buscar</label>
-                            <button class="btn btn-primary" id="btnCP" onclick=validaCP()>
-                                <i class="fa fa-search"></i>
-                            </button>
+                            <div class="input-group">
+                                <input class="form-control"
+                                    id="QuejasCP"
+                                    maxlength="5"
+                                    onkeypress="validaEntradaCP(event)" />
+
+                                <span class="input-group-btn">
+                                    <button class="btn btn-primary"
+                                        type="button"
+                                        onclick="validaCP()"
+                                        id="btnCP">
+                                        <i class="fa fa-search"></i>
+                                    </button>
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -164,14 +170,14 @@
                     <div class=" col-md-3">
                         <div class="form-group">
                             <label for="QuejasFecResolucion">Fecha de resolución *</label>
-                            <input type="date" class="form-control" id="QuejasFecResolucion" value="<?= $fecha ?>" disabled/>
+                            <input type="date" class="form-control" id="QuejasFecResolucion" value="<?= $fecha ?>" disabled />
                         </div>
                     </div>
 
                     <div class="col-md-3">
                         <div class="form-group">
                             <label for="QuejasFecNotificacion">Fecha notificación al usuario *</label>
-                            <input type="date" class="form-control" id="QuejasFecNotificacion" value="<?= $fecha ?>" oninput=validaRequeridos() disabled/>
+                            <input type="date" class="form-control" id="QuejasFecNotificacion" value="<?= $fecha ?>" oninput=validaRequeridos() disabled />
                         </div>
                     </div>
                     <div class="col-md-3">

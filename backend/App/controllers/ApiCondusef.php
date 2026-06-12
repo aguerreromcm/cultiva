@@ -178,7 +178,7 @@ class ApiCondusef extends Controller
                 const insertaOpciones = (elemento, opciones = []) => {
                     if (opciones.length > 1) opciones.unshift("<option value='' disabled>Seleccione</option>")
                     
-                    elemento.html(opciones.join(""))
+                    elemento.innerHTML = opciones.join("")
                     elemento.selectedIndex = 0
                     elemento.disabled = !(opciones.length > 1)
                 }
@@ -265,10 +265,9 @@ class ApiCondusef extends Controller
 
                     const procesaError = (respuesta) => {
                         let mensaje = "Ocurrieron los siguientes errores:\\n\\n"
-                        respuesta.errors[datos[0].QuejasFolio].forEach((error, i) => {
+                        respuesta.errors.forEach((error, i) => {
                             mensaje += (i+1) + ".-" + error + "\\n" 
                         })
-                        mensaje += "\\n" + respuesta.message
                         return showError(mensaje)
                     }
                             
@@ -310,16 +309,22 @@ class ApiCondusef extends Controller
             $opcionesNiveles .= "<option value='{$value['nivelDeAtencionId']}'>{$value['nivelDeAtencionDsc']}</option>";
         }
 
-        $productos = ApiCondusefDao::GetProductos();
         $opcionesProductos = "<option value='' disabled selected>Seleccionar</option>";
-        foreach ($productos as $key => $value) {
-            $opcionesProductos .= "<option value='{$value['CODIGO']}'>{$value['PRODUCTO']}</option>";
+        $productos = ApiCondusefDao::GetProductosREDECO();
+        if ($productos['success']) {
+            $productos = $productos['datos'];
+            foreach ($productos as $key => $value) {
+                $opcionesProductos .= "<option value='{$value['CODIGO']}'>{$value['PRODUCTO']}</option>";
+            }
         }
 
-        $causas = ApiCondusefDao::GetCausas();
         $opcionesCausas = "<option value='' disabled selected>Seleccionar</option>";
-        foreach ($causas as $key => $value) {
-            $opcionesCausas .= "<option value='{$value['CODIGO']}'>{$value['DESCRIPCION']}</option>";
+        $causas = ApiCondusefDao::GetCausasREDECO();
+        if ($causas['success']) {
+            $causas = $causas['datos'];
+            foreach ($causas as $key => $value) {
+                $opcionesCausas .= "<option value='{$value['CODIGO']}'>{$value['DESCRIPCION']}</option>";
+            }
         }
 
         View::set('header', $this->_contenedor->header(self::GetExtraHeader("Registrar Quejas REDECO")));
@@ -676,22 +681,8 @@ class ApiCondusef extends Controller
         </script>
         HTML;
 
-        $trimestres = [
-            "1" => "Enero - Marzo",
-            "2" => "Abril - Junio",
-            "3" => "Julio - Septiembre",
-            "4" => "Octubre - Diciembre"
-        ];
-
-        $opcionesMeses = "";
-        foreach ($trimestres as $key => $value) {
-            if (intval($key) == ceil(date('m') / 3)) $opcionesMeses .= "<option value='{$key}' selected>{$value}</option>";
-            else $opcionesMeses .= "<option value='{$key}'>{$value}</option>";
-        }
-
-        $producto_causa = ApiCondusefDao::GetProductos();
-
         $opcionesProductos = "<option value='' disabled selected>Seleccionar</option>";
+        $producto_causa = ApiCondusefDao::GetProductosREUNE();
         if ($producto_causa['success']) {
             $causas = $producto_causa['datos']['causas'];
             foreach ($producto_causa['datos']['productos'] as $codProd => $nombre) {
@@ -701,7 +692,6 @@ class ApiCondusef extends Controller
 
         View::set('header', $this->_contenedor->header(self::GetExtraHeader("Registrar Quejas REUNE")));
         View::set('footer', $this->_contenedor->footer($extraFooter));
-        View::set('meses', $opcionesMeses);
         View::set('productos', $opcionesProductos);
         View::set('causas', $causas);
         View::render("z_api_agregar_quejas_REUNE");
