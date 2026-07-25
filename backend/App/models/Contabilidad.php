@@ -84,6 +84,7 @@ class Contabilidad extends Model
                     ,SUM(DECODE(PGS.ESTATUS, 'GP', PGS.CANTIDAD, 0)) AS GP
                     ,SUM(DECODE(PGS.ESTATUS, 'DE', PGS.CANTIDAD, 0)) AS DE
                     ,SUM(DECODE(PGS.ESTATUS, 'CD', PGS.CANTIDAD, 0)) AS CD
+                    ,SUM(DECODE(PGS.ESTATUS, 'LG', PGS.CANTIDAD, 0)) AS LG
                     ,SUM(PGS.CANTIDAD) AS TOTAL
                     ,COUNT(*) AS MOVIMIENTOS
                 FROM PAG_GAR_SIM PGS
@@ -132,6 +133,7 @@ class Contabilidad extends Model
                 ,C.SITUACION
                 ,NVL(SI.SDO_INI, 0) AS SDO_INI
                 ,NVL(SI.SDO_INI, 0) + NVL(G.TOTAL, 0) AS SDO_FIN
+                ,NVL(G.LG, 0) AS "LIQUIDACION DE GARANTIA"
                 ,NVL(G.RE, 0) AS "PAGO COMISION"
                 ,NVL(G.DC, 0) AS "DEVOLUCION POR CANCELACION DE CHEQUE"
                 ,NVL(G.CO, 0) AS "CONCILIACION COMISION"

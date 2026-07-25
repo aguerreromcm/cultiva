@@ -268,6 +268,7 @@ class Contabilidad extends Controller
             \PHPSpreadsheet::ColumnaExcel('SITUACION', 'Situación'),
             \PHPSpreadsheet::ColumnaExcel('SDO_INI', 'Saldo Inicial', $moneda),
             \PHPSpreadsheet::ColumnaExcel('SDO_FIN', 'Saldo Final', $moneda),
+            \PHPSpreadsheet::ColumnaExcel('LIQUIDACION DE GARANTIA', 'Liquiación de Garantía', $moneda),
             \PHPSpreadsheet::ColumnaExcel('PAGO COMISION', 'Pago Comisión', $moneda),
             \PHPSpreadsheet::ColumnaExcel('DEVOLUCION POR CANCELACION DE CHEQUE', 'Devolución por Cancelación de Cheque', $moneda),
             \PHPSpreadsheet::ColumnaExcel('CONCILIACION COMISION', 'Conciliación Comisión', $moneda),
