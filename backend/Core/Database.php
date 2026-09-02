@@ -26,8 +26,12 @@ class Database
         $s = $this->configuracion[$s] ?? $s;
         $servidor = $s ?? $this->configuracion['SERVIDOR'];
         $esquema = $this->configuracion['ESQUEMA'] ?? 'ESIACOM';
+        $puerto = trim((string) ($this->configuracion['PUERTO'] ?? ''));
+        if ($puerto === '') {
+            $puerto = '1521';
+        }
 
-        $cadena = "oci:dbname=//$servidor:1521/$esquema;charset=UTF8";
+        $cadena = "oci:dbname=//$servidor:$puerto/$esquema;charset=UTF8";
         $usuario = $u ?? $this->configuracion['USUARIO'];
         $password = $p ?? $this->configuracion['PASSWORD'];
         try {
