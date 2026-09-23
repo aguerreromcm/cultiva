@@ -940,3 +940,105 @@
         justify-content: center;
     }
 }
+
+/* Modal de previsualización más ancho para la tabla de registros */
+#modalPreviewImportacion .ci-modal-preview {
+    width: 92%;
+    max-width: 1200px;
+}
+
+.ci-desglose-fechas {
+    margin: 0 0 16px;
+}
+
+.ci-desglose-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.ci-desglose-head i {
+    color: #1a6fb5;
+    opacity: 1;
+}
+
+.ci-desglose-wrap {
+    width: 100%;
+    max-height: 200px;
+    overflow: auto;
+    border: 1px solid rgba(127, 143, 166, 0.35);
+    border-radius: 10px;
+    background: rgba(127, 143, 166, 0.06);
+}
+
+.ci-desglose-tabla {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+}
+
+.ci-desglose-tabla th,
+.ci-desglose-tabla td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(127, 143, 166, 0.22);
+    white-space: nowrap;
+    vertical-align: middle;
+    text-align: center;
+}
+
+.ci-desglose-tabla thead th {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+    background: rgba(127, 143, 166, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.ci-desglose-tabla tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.ci-desglose-tabla .num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.ci-desglose-tabla tr.has-incidencias td.num:last-child {
+    color: #d97706;
+    font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ci-desglose-wrap {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .ci-desglose-tabla th,
+    .ci-desglose-tabla td {
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .ci-desglose-tabla thead th {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    .ci-desglose-tabla tr.has-incidencias td.num:last-child {
+        color: #f0c674;
+    }
+}
+
+@media (max-width: 991px) {
+    #modalPreviewImportacion .ci-modal-preview {
+        width: auto;
+        max-width: none;
+    }
+}

@@ -92,14 +92,14 @@ class ImportacionPagosRepository
         return $fecha . '|' . $referencia . '|' . number_format($montoNum, 2, '.', '');
     }
 
-    public function siguienteIdImportacion(): int
+    public function siguienteIdLoteImportacion(): int
     {
         $db = new Database();
         if ($db->db_activa === null) {
             return (int) time();
         }
 
-        $sql = 'SELECT NVL(MAX(ID_IMPORTACION), 0) + 1 AS SIG FROM PAGOSDIA';
+        $sql = 'SELECT NVL(MAX(ID_LOTE_IMPORTACION), 0) + 1 AS SIG FROM PAGOSDIA';
         try {
             $row = $db->queryOne($sql);
             $sig = (int) ($row['SIG'] ?? 0);
@@ -107,6 +107,12 @@ class ImportacionPagosRepository
         } catch (\Throwable $e) {
             return (int) time();
         }
+    }
+
+    /** @deprecated Usar siguienteIdLoteImportacion() */
+    public function siguienteIdImportacion(): int
+    {
+        return $this->siguienteIdLoteImportacion();
     }
 
     /**
@@ -174,7 +180,11 @@ class ImportacionPagosRepository
         }
     }
 
-    public function generarReferencia(string $credito, string $ciclo): ?string
+    /**
+     * Genera referencia de pago: 'P' || crédito || CDGTPC || FN_DV('P' || crédito || CDGTPC).
+     * CDGTPC = tipo de producto en PRN (no el ciclo).
+     */
+    public function generarReferencia(string $credito, string $cdgtpc): ?string
     {
         $db = new Database();
         if ($db->db_activa === null) {
@@ -182,14 +192,21 @@ class ImportacionPagosRepository
         }
 
         $credito = str_pad(preg_replace('/\D/', '', $credito), 6, '0', STR_PAD_LEFT);
-        $ciclo = str_pad(preg_replace('/\D/', '', $ciclo), 2, '0', STR_PAD_LEFT);
-        $base = 'P' . $credito . $ciclo;
-        $sql = "SELECT 'P' || :credito || :ciclo || FN_DV(:base) AS REFERENCIA FROM DUAL";
+        $cdgtpc = trim($cdgtpc);
+        if ($cdgtpc === '') {
+            return null;
+        }
+        if (preg_match('/^\d+$/', $cdgtpc)) {
+            $cdgtpc = str_pad($cdgtpc, 2, '0', STR_PAD_LEFT);
+        }
+
+        $base = 'P' . $credito . $cdgtpc;
+        $sql = "SELECT 'P' || :credito || :cdgtpc || FN_DV(:base) AS REFERENCIA FROM DUAL";
 
         try {
             $row = $db->queryOne($sql, [
                 'credito' => $credito,
-                'ciclo' => $ciclo,
+                'cdgtpc' => $cdgtpc,
                 'base' => $base,
             ]);
             $ref = isset($row['REFERENCIA']) ? trim((string) $row['REFERENCIA']) : '';
@@ -215,7 +232,7 @@ class ImportacionPagosRepository
             INSERT INTO PAGOSDIA (
                 CDGEM, CDGNS, CICLO, SECUENCIA, FECHA, MONTO, TIPO, ESTATUS,
                 FREGISTRO, CDGPE, NOMBRE, CDGOCPE, EJECUTIVO,
-                REFERENCIA, ARCHIVO, ID_IMPORTACION, INCIDENCIA
+                REFERENCIA, ARCHIVO, ID_LOTE_IMPORTACION, INCIDENCIA
             ) VALUES (
                 'EMPFIN',
                 :cdgns,
@@ -232,7 +249,7 @@ class ImportacionPagosRepository
                 NVL((SELECT GET_NOMBRE_EMPLEADO(:cdgocpe_nom) FROM DUAL), ' '),
                 :referencia,
                 :archivo,
-                :id_importacion,
+                :id_lote,
                 :incidencia
             )
         SQL;
@@ -249,7 +266,7 @@ class ImportacionPagosRepository
             'cdgocpe_nom' => $pago['CDGOCPE'] ?? ' ',
             'referencia' => $pago['REFERENCIA'],
             'archivo' => $pago['ARCHIVO'],
-            'id_importacion' => $pago['ID_IMPORTACION'],
+            'id_lote' => $pago['ID_LOTE_IMPORTACION'],
             'incidencia' => $pago['INCIDENCIA'] ?? 0,
         ]);
     }
@@ -286,7 +303,7 @@ class ImportacionPagosRepository
                 PD.MONTO,
                 PD.REFERENCIA,
                 PD.ARCHIVO,
-                PD.ID_IMPORTACION
+                PD.ID_LOTE_IMPORTACION
             FROM PAGOSDIA PD
             WHERE {$cond}
             ORDER BY PD.FECHA DESC, PD.SECUENCIA DESC
@@ -303,7 +320,7 @@ class ImportacionPagosRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listarDetalleImportacion(?string $archivo, $idImportacion = null): array
+    public function listarDetalleImportacion(?string $archivo, $idLote = null): array
     {
         $archivo = trim((string) $archivo);
         if ($archivo === '') {
@@ -317,9 +334,9 @@ class ImportacionPagosRepository
 
         $params = ['archivo' => $archivo];
         $condId = '';
-        if ($idImportacion !== null && $idImportacion !== '') {
-            $condId = ' AND ID_IMPORTACION = :id_imp';
-            $params['id_imp'] = (int) $idImportacion;
+        if ($idLote !== null && $idLote !== '') {
+            $condId = ' AND ID_LOTE_IMPORTACION = :id_lote';
+            $params['id_lote'] = (int) $idLote;
         }
 
         $sql = <<<SQL
@@ -333,7 +350,9 @@ class ImportacionPagosRepository
                 REFERENCIA,
                 NVL(INCIDENCIA, 0) AS INCIDENCIA,
                 ARCHIVO,
-                ID_IMPORTACION
+                ID_LOTE_IMPORTACION,
+                ID_IMPORTACION,
+                F_IMPORTACION
             FROM PAGOSDIA
             WHERE CDGEM = 'EMPFIN'
               AND ESTATUS = 'A'
@@ -360,18 +379,26 @@ class ImportacionPagosRepository
             return [];
         }
 
+        // FECHA_CARGA = momento de carga (FREGISTRO). No confundir con F_IMPORTACION del cierre.
         $sql = <<<SQL
             SELECT
                 ARCHIVO,
-                ID_IMPORTACION,
+                ID_LOTE_IMPORTACION,
                 MIN(TO_CHAR(FECHA, 'DD/MM/YYYY')) AS FECHA_PAGO,
                 COUNT(*) AS REGISTROS,
                 SUM(MONTO) AS MONTO_TOTAL,
                 SUM(CASE WHEN INCIDENCIA = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS,
-                MIN(TO_CHAR(FREGISTRO, 'DD/MM/YYYY HH24:MI:SS')) AS F_IMPORTACION
+                MIN(TO_CHAR(FREGISTRO, 'DD/MM/YYYY HH24:MI:SS')) AS FECHA_CARGA,
+                CASE
+                    WHEN SUM(CASE
+                        WHEN ID_IMPORTACION IS NOT NULL OR F_IMPORTACION IS NOT NULL THEN 1
+                        ELSE 0
+                    END) = 0 THEN 1
+                    ELSE 0
+                END AS PUEDE_ELIMINAR
             FROM PAGOSDIA
             WHERE ARCHIVO IS NOT NULL
-            GROUP BY ARCHIVO, ID_IMPORTACION
+            GROUP BY ARCHIVO, ID_LOTE_IMPORTACION
             ORDER BY MAX(FREGISTRO) DESC
         SQL;
 
@@ -380,6 +407,116 @@ class ImportacionPagosRepository
             return is_array($filas) ? $filas : [];
         } catch (\Throwable $e) {
             return [];
+        }
+    }
+
+    /**
+     * Indica si algún pago del lote ya fue procesado en cierre
+     * (ID_IMPORTACION o F_IMPORTACION marcados).
+     */
+    public function loteProcesadoEnCierre(string $archivo, $idLote = null): bool
+    {
+        $archivo = trim($archivo);
+        if ($archivo === '') {
+            return true;
+        }
+
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return true;
+        }
+
+        $params = ['archivo' => $archivo];
+        $condLote = '';
+        if ($idLote !== null && $idLote !== '') {
+            $condLote = ' AND ID_LOTE_IMPORTACION = :id_lote';
+            $params['id_lote'] = (int) $idLote;
+        }
+
+        $sql = <<<SQL
+            SELECT COUNT(*) AS TOTAL
+            FROM PAGOSDIA
+            WHERE ARCHIVO = :archivo
+              {$condLote}
+              AND (ID_IMPORTACION IS NOT NULL OR F_IMPORTACION IS NOT NULL)
+              AND ROWNUM = 1
+        SQL;
+
+        try {
+            $row = $db->queryOne($sql, $params);
+            return isset($row['TOTAL']) && (int) $row['TOTAL'] > 0;
+        } catch (\Throwable $e) {
+            return true;
+        }
+    }
+
+    /**
+     * Elimina los pagos de un archivo/lote solo si ninguno fue procesado en cierre.
+     *
+     * @return array{ok: bool, eliminados: int, mensaje: string}
+     */
+    public function eliminarLoteImportacion(string $archivo, $idLote = null): array
+    {
+        $archivo = trim($archivo);
+        if ($archivo === '') {
+            return ['ok' => false, 'eliminados' => 0, 'mensaje' => 'Archivo requerido.'];
+        }
+
+        if ($this->loteProcesadoEnCierre($archivo, $idLote)) {
+            return [
+                'ok' => false,
+                'eliminados' => 0,
+                'mensaje' => 'No se puede eliminar: uno o más pagos ya fueron procesados en el cierre.',
+            ];
+        }
+
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return ['ok' => false, 'eliminados' => 0, 'mensaje' => 'No hay conexión a la base de datos.'];
+        }
+
+        $params = ['archivo' => $archivo];
+        $condLote = '';
+        if ($idLote !== null && $idLote !== '') {
+            $condLote = ' AND ID_LOTE_IMPORTACION = :id_lote';
+            $params['id_lote'] = (int) $idLote;
+        }
+
+        $sqlCount = <<<SQL
+            SELECT COUNT(*) AS TOTAL
+            FROM PAGOSDIA
+            WHERE ARCHIVO = :archivo
+              {$condLote}
+              AND ID_IMPORTACION IS NULL
+              AND F_IMPORTACION IS NULL
+        SQL;
+
+        $sqlDelete = <<<SQL
+            DELETE FROM PAGOSDIA
+            WHERE ARCHIVO = :archivo
+              {$condLote}
+              AND ID_IMPORTACION IS NULL
+              AND F_IMPORTACION IS NULL
+        SQL;
+
+        try {
+            $row = $db->queryOne($sqlCount, $params);
+            $total = (int) ($row['TOTAL'] ?? 0);
+            if ($total === 0) {
+                return ['ok' => false, 'eliminados' => 0, 'mensaje' => 'No hay registros para eliminar.'];
+            }
+
+            if (!$db->insert($sqlDelete, $params)) {
+                return ['ok' => false, 'eliminados' => 0, 'mensaje' => 'No se pudieron eliminar los registros.'];
+            }
+
+            return [
+                'ok' => true,
+                'eliminados' => $total,
+                'mensaje' => "Se eliminaron {$total} pago(s) del archivo.",
+            ];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'eliminados' => 0, 'mensaje' => 'Error al eliminar el archivo.'];
         }
     }
 

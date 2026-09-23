@@ -2,7 +2,7 @@
 configuracion.ini
 backend/Jobs/Logs/*
 .pdf
-.sql
+*.sql
 .ini
 
 # Servicio PUI vive en repo aparte (carpeta PUI/ en la raíz del workspace)

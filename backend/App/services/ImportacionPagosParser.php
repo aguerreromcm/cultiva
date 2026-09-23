@@ -182,8 +182,8 @@ class ImportacionPagosParser
     }
 
     /**
-     * Extrae pagos BanCoppel. Incluye referencias inválidas (ej. "21011436649 mariposas")
-     * para que el flujo las marque como incidencia 000000/00.
+     * Extrae pagos BanCoppel. Incluye referencias inválidas (ej. "mariposas",
+     * "Transf. a FINANCIERA CULTIVA", "Empoderadas") para marcarlas como incidencia 000000/00.
      *
      * @param list<array<int, mixed>> $filas
      * @return list<array<string, mixed>>
@@ -256,9 +256,6 @@ class ImportacionPagosParser
         if ($referencia === '' || self::esFilaResumenBanCoppel($referencia)) {
             return null;
         }
-        if (stripos($referencia, 'PAGOS') !== false && stripos($referencia, 'BANCOPPEL') !== false) {
-            return null;
-        }
         if (strcasecmp($referencia, 'REFERENCIA') === 0 || strcasecmp($referencia, 'FECHA') === 0) {
             return null;
         }
@@ -280,46 +277,61 @@ class ImportacionPagosParser
         $fecha = null;
         $referencia = null;
         $monto = null;
+        $celdas = [];
 
         foreach ($fila as $celda) {
             $texto = trim((string) $celda);
             if ($texto === '') {
                 continue;
             }
+            $upper = strtoupper($texto);
+            if (in_array($upper, ['FECHA', 'REFERENCIA', 'MONTO', 'MONED', 'MONEDA', 'MN'], true)) {
+                continue;
+            }
+            if (self::esTituloLayoutBanCoppel($texto)) {
+                return null;
+            }
+            $celdas[] = $texto;
+        }
+
+        foreach ($celdas as $texto) {
             if ($fecha === null) {
                 $f = self::parsearFechaFlexible($texto);
                 if ($f !== null) {
                     $fecha = $f;
-                    continue;
                 }
             }
-            if ($monto === null) {
-                // Evita tomar el serial de fecha como monto si aún no hay fecha parseada.
-                $m = self::parsearMontoFlexible($texto);
-                if ($m !== null && $m > 0 && !preg_match('/^\d{5}(\.\d+)?$/', $texto)) {
-                    // Referencias tipo P00… no son montos; montos suelen ser numéricos puros o con separadores.
-                    if (preg_match('/^[\d.,\s$]+$/', $texto)) {
-                        $monto = $m;
-                        continue;
-                    }
-                }
+        }
+
+        foreach ($celdas as $texto) {
+            if ($referencia !== null) {
+                break;
             }
-            if ($referencia === null) {
-                $upper = strtoupper($texto);
-                if (in_array($upper, ['FECHA', 'REFERENCIA', 'MONTO', 'MONED', 'MONEDA', 'MN'], true)) {
-                    continue;
-                }
-                if (self::esFilaResumenBanCoppel($texto)) {
-                    return null;
-                }
-                // Referencia válida P/C/0/1… o el caso práctico inválido (dígitos + texto).
-                $token = preg_split('/\s+/', $texto)[0] ?? '';
-                if (self::referenciaPaycashValida(strtoupper($token))
-                    || preg_match('/^\d{6,}/', $token)
-                    || (isset($texto[0]) && in_array(strtoupper($texto[0]), ['P', 'C'], true))
-                ) {
-                    $referencia = $texto;
-                }
+            if ($fecha !== null && self::parsearFechaFlexible($texto) === $fecha) {
+                continue;
+            }
+            // Ref válida P/C/0/1… o inválida con dígitos + texto (Transf./Empoderadas/mariposas).
+            if (self::esCandidatoReferenciaBanCoppel($texto)) {
+                $referencia = $texto;
+            }
+        }
+
+        foreach ($celdas as $texto) {
+            if ($monto !== null) {
+                break;
+            }
+            if ($fecha !== null && self::parsearFechaFlexible($texto) === $fecha) {
+                continue;
+            }
+            if ($referencia !== null && $texto === $referencia) {
+                continue;
+            }
+            if (!self::pareceMontoBanCoppel($texto)) {
+                continue;
+            }
+            $m = self::parsearMontoFlexible($texto);
+            if ($m !== null && $m > 0) {
+                $monto = $m;
             }
         }
 
@@ -328,6 +340,72 @@ class ImportacionPagosParser
         }
 
         return ['fecha' => $fecha, 'referencia' => $referencia, 'monto' => $monto];
+    }
+
+    /** Título de hoja/archivo, no un movimiento. */
+    private static function esTituloLayoutBanCoppel(string $texto): bool
+    {
+        $ref = strtoupper(trim($texto));
+        return strpos($ref, 'PAGOS') !== false && strpos($ref, 'BANCOPPEL') !== false;
+    }
+
+    /**
+     * Candidatos a referencia BanCoppel (válida o inválida → incidencia).
+     */
+    private static function esCandidatoReferenciaBanCoppel(string $texto): bool
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return false;
+        }
+        $token = preg_split('/\s+/', strtoupper($texto))[0] ?? '';
+        if (self::referenciaPaycashValida($token)) {
+            return true;
+        }
+        // P/C + dígitos aunque la longitud no sea 10
+        if (preg_match('/^[PC]\d{4,}/i', $token)) {
+            return true;
+        }
+        // Solo dígitos (cuenta/folio) o dígitos + texto descriptivo
+        if (preg_match('/^\d{6,}(\s+.+)?$/u', $texto)) {
+            return true;
+        }
+        // Texto de movimiento sin prefijo numérico claro (p. ej. solo quedó "Empoderadas")
+        $upper = strtoupper($texto);
+        foreach (['TRANSF', 'FINANCIERA', 'EMPODERADAS', 'MARIPOSAS'] as $marca) {
+            if (strpos($upper, $marca) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Evita tomar folios/cuentas (enteros largos sin decimales) como monto.
+     */
+    private static function pareceMontoBanCoppel(string $texto): bool
+    {
+        $texto = trim($texto);
+        if ($texto === '' || !preg_match('/^[\d.,\s$]+$/', $texto)) {
+            return false;
+        }
+        // Serial Excel de fecha
+        if (preg_match('/^\d{5}(\.\d+)?$/', $texto)) {
+            return false;
+        }
+        // Folio/cuenta: 8+ dígitos sin separadores de miles ni decimales
+        if (preg_match('/^\d{8,}$/', $texto)) {
+            return false;
+        }
+        $monto = self::parsearMontoFlexible($texto);
+        if ($monto === null || $monto <= 0) {
+            return false;
+        }
+        // Pagos de corresponsal no llegan a montos de 8+ cifras enteras sin formato
+        if ($monto >= 10000000) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -529,25 +607,28 @@ class ImportacionPagosParser
             return [];
         }
 
+        // Algunos exports bancarios parten el layout en varias <table>; hay que unirlas.
         $filas = [];
-        $tabla = $tablas->item(0);
-        if (!$tabla instanceof \DOMElement) {
-            return [];
-        }
-        foreach ($tabla->getElementsByTagName('tr') as $tr) {
-            $fila = [];
-            foreach ($tr->childNodes as $celda) {
-                if (!$celda instanceof \DOMElement) {
-                    continue;
-                }
-                $tag = strtolower($celda->tagName);
-                if ($tag !== 'td' && $tag !== 'th') {
-                    continue;
-                }
-                $fila[] = trim(html_entity_decode($celda->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        for ($t = 0; $t < $tablas->length; $t++) {
+            $tabla = $tablas->item($t);
+            if (!$tabla instanceof \DOMElement) {
+                continue;
             }
-            if (!empty($fila)) {
-                $filas[] = $fila;
+            foreach ($tabla->getElementsByTagName('tr') as $tr) {
+                $fila = [];
+                foreach ($tr->childNodes as $celda) {
+                    if (!$celda instanceof \DOMElement) {
+                        continue;
+                    }
+                    $tag = strtolower($celda->tagName);
+                    if ($tag !== 'td' && $tag !== 'th') {
+                        continue;
+                    }
+                    $fila[] = trim(html_entity_decode($celda->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                }
+                if (!empty($fila)) {
+                    $filas[] = $fila;
+                }
             }
         }
         return $filas;
@@ -559,13 +640,21 @@ class ImportacionPagosParser
         return strpos($texto, 'FECHA') !== false && strpos($texto, 'REFERENCIA') !== false;
     }
 
+    /**
+     * Omite solo títulos/encabezados de layout, no movimientos con referencia
+     * (aunque digan TRANSF/FINANCIERA: van como incidencia si la ref es inválida).
+     */
     private static function esFilaResumenBanCoppel(string $referencia): bool
     {
-        $ref = strtoupper($referencia);
-        if (stripos($ref, 'TRANSF') !== false) {
+        $ref = strtoupper(trim($referencia));
+        if ($ref === '') {
             return true;
         }
-        if (stripos($ref, 'FINANCIERA') !== false) {
+        if (self::esTituloLayoutBanCoppel($ref)) {
+            return true;
+        }
+        // Encabezado de columnas
+        if (in_array($ref, ['FECHA', 'REFERENCIA', 'MONTO', 'MONED', 'MONEDA', 'MN'], true)) {
             return true;
         }
         return false;

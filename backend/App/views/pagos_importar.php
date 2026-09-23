@@ -44,36 +44,8 @@
                             <button type="button" id="btn_previsualizar" class="btn btn-primary">
                                 <i class="fa fa-eye"></i> Previsualizar
                             </button>
-                            <button type="button" id="btn_confirmar" class="btn btn-success" disabled>
-                                <i class="fa fa-upload"></i> Confirmar
-                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div id="panel-preview" class="panel-card" style="display: none;">
-                <div class="head">
-                    <h4><i class="fa fa-eye"></i> Vista previa del archivo</h4>
-                    <span class="ft-conteo" id="resumen-preview"></span>
-                </div>
-                <div class="body">
-                    <div class="ft-encabezado-tabla">
-                        <h4 class="titulo"><i class="fa fa-list"></i> Registros detectados</h4>
-                    </div>
-                    <table class="table table-striped table-bordered table-hover" id="tabla-preview-importacion">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Referencia</th>
-                                <th>Crédito</th>
-                                <th>Ciclo</th>
-                                <th>Monto</th>
-                                <th>Estatus</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
                 </div>
             </div>
 
@@ -96,6 +68,7 @@
                     <div role="tabpanel" class="tab-pane active" id="tab-historial">
                         <p class="ci-tab-intro">
                             Archivos ya importados en el sistema. Si un archivo aparece aquí, no podrá cargarse de nuevo.
+                            Puede eliminarlo solo si ninguno de sus pagos ha sido procesado en el cierre.
                         </p>
                         <table class="table table-striped table-bordered table-hover" id="tabla-historial-importacion">
                             <thead>
@@ -139,6 +112,42 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalPreviewImportacion" tabindex="-1" role="dialog" aria-labelledby="modalPreviewImportacionTitle">
+    <div class="modal-dialog modal-lg ci-modal-preview" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar"><span>&times;</span></button>
+                <h4 class="modal-title" id="modalPreviewImportacionTitle">Vista previa del archivo</h4>
+            </div>
+            <div class="modal-body">
+                <p class="ci-tab-intro" style="margin-top: 0;">
+                    <span id="resumen-preview" class="text-muted"></span>
+                </p>
+                <div id="desglose-preview-fechas" class="ci-desglose-fechas" style="display: none;"></div>
+                <table class="table table-striped table-bordered table-hover" id="tabla-preview-importacion">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Referencia</th>
+                            <th>Crédito</th>
+                            <th>Ciclo</th>
+                            <th>Monto</th>
+                            <th>Estatus</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+                <button type="button" id="btn_confirmar" class="btn btn-success" disabled>
+                    <i class="fa fa-upload"></i> Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalDetalleImportacion" tabindex="-1" role="dialog" aria-labelledby="modalDetalleImportacionTitle">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -151,6 +160,7 @@
                     Archivo: <strong id="detalle_archivo_nombre"></strong>
                     <span id="detalle_resumen" class="text-muted"></span>
                 </p>
+                <div id="desglose-detalle-fechas" class="ci-desglose-fechas" style="display: none;"></div>
                 <table class="table table-striped table-bordered table-hover" id="tabla-detalle-importacion">
                     <thead>
                         <tr>
@@ -196,7 +206,7 @@
                 </div>
                 <p class="text-muted small" style="margin-bottom: 0;">
                     Se validará que el crédito y ciclo correspondan a un préstamo en situación Entregado.
-                    La referencia se generará automáticamente con el dígito verificador.
+                    La referencia se generará con el tipo de producto del préstamo (CDGTPC) y el dígito verificador.
                 </p>
             </div>
             <div class="modal-footer">

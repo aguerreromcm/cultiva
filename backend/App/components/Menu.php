@@ -106,7 +106,9 @@ class Menu
     private function opcionesCreditos()
     {
         $permisos = ['AMGM', 'PHEE', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
+        $permisosImportar = ['ADMIN', 'OFCLD', 'PLMV', 'LGFR', 'AMGM', 'GASC'];
         return [
+            $this->enlace('Importar Pagos', '/Pagos/ImportarPagos/', $permisosImportar),
             $this->enlace('Reporte de Referencias', '/Creditos/ReporteReferencias/', $permisos),
             $this->enlace('Reporte de Prestamos', '/Creditos/ReportePrestamos/', $permisos),
         ];
@@ -150,15 +152,6 @@ class Menu
         ];
     }
 
-    /** Opciones del submenú Pagos */
-    private function opcionesPagos()
-    {
-        $permisos = ['ADMIN', 'OFCLD', 'PLMV', 'LGFR', 'AMGM', 'GASC'];
-        return [
-            $this->enlace('Importar Pagos', '/Pagos/ImportarPagos/', $permisos, 'glyphicon glyphicon-import'),
-        ];
-    }
-
     /** Opciones del submenú Herramientas (visibilidad según config) */
     private function opcionesHerramientas()
     {
@@ -181,7 +174,6 @@ class Menu
             $this->submenu('Circulo de Crédito', 'glyphicon glyphicon-ok-circle', $this->opcionesCirculoCredito()),
             $this->submenu('Operaciones', 'glyphicon glyphicon-cog', $this->opcionesOperaciones()),
             $this->submenu('Contabilidad', 'glyphicon glyphicon-briefcase', $this->opcionesContabilidad()),
-            $this->submenu('Pagos', 'glyphicon glyphicon-usd', $this->opcionesPagos()),
         ];
 
         if ($this->mostrarHerramientas) {

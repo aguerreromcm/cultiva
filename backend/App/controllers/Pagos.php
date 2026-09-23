@@ -51,11 +51,9 @@ class Pagos extends Controller
                     const motivo = (f.MOTIVO_INCIDENCIA || "").trim();
                     let estatus;
                     if (f.DUPLICADO) {
-                        estatus = "<span class='badge-duplicado' title='" + motivoDup.replace(/'/g, "&#39;") + "'>Duplicado</span>"
-                            + (motivoDup ? "<span class='celda-secundaria ci-motivo'>" + motivoDup + "</span>" : "");
+                        estatus = "<span class='badge-duplicado'>" + (motivoDup || "Duplicado") + "</span>";
                     } else if (f.INCIDENCIA) {
-                        estatus = "<span class='badge-revisar' title='" + motivo.replace(/'/g, "&#39;") + "'>Revisar</span>"
-                            + (motivo ? "<span class='celda-secundaria ci-motivo'>" + motivo + "</span>" : "");
+                        estatus = "<span class='badge-revisar'>" + (motivo || "Incidencia") + "</span>";
                     } else {
                         estatus = "<span class='badge-ok'>OK</span>";
                     }
@@ -71,43 +69,107 @@ class Pagos extends Controller
                 actualizaDatosTabla(idTablaPreview, datos);
             };
 
+            const renderDesglosePreview = (filas, selector) => {
+                const box = $(selector || "#desglose-preview-fechas");
+                if (!box.length) return;
+
+                const mapa = {};
+                (filas || []).forEach((f) => {
+                    const clave = f.FECHA || "";
+                    const etiqueta = f.FECHA_FMT || f.FECHA || "-";
+                    if (!mapa[clave]) {
+                        mapa[clave] = { etiqueta: etiqueta, registros: 0, monto: 0, incidencias: 0 };
+                    }
+                    mapa[clave].registros++;
+                    mapa[clave].monto += parseFloat(f.MONTO) || 0;
+                    if (Number(f.INCIDENCIA) === 1) {
+                        mapa[clave].incidencias++;
+                    }
+                });
+                const dias = Object.keys(mapa).sort();
+                if (dias.length <= 1) {
+                    box.hide().empty();
+                    return;
+                }
+
+                const head = $("<div>").addClass("ci-desglose-head")
+                    .append($("<i>").addClass("fa fa-calendar"))
+                    .append(document.createTextNode(" Desglose por día"));
+
+                const tabla = $("<table>").addClass("ci-desglose-tabla");
+                tabla.append(
+                    $("<thead>").append(
+                        $("<tr>")
+                            .append($("<th>").text("Fecha"))
+                            .append($("<th>").addClass("num").text("Registros"))
+                            .append($("<th>").addClass("num").text("Monto"))
+                            .append($("<th>").addClass("num").text("Incidencias"))
+                    )
+                );
+                const tbody = $("<tbody>");
+                dias.forEach((d) => {
+                    const row = mapa[d];
+                    const tr = $("<tr>");
+                    if (row.incidencias > 0) tr.addClass("has-incidencias");
+                    tr.append($("<td>").text(row.etiqueta));
+                    tr.append($("<td>").addClass("num").text(row.registros));
+                    tr.append($("<td>").addClass("num").text(formateaMoneda(row.monto)));
+                    tr.append($("<td>").addClass("num").text(row.incidencias));
+                    tbody.append(tr);
+                });
+                tabla.append(tbody);
+
+                box.empty()
+                    .append(head)
+                    .append($("<div>").addClass("ci-desglose-wrap").append(tabla))
+                    .show();
+            };
+
             const cargarHistorial = () => {
                 $.getJSON("/Pagos/ListarHistorial/", (res) => {
-                    if (!res.success) return;
+                    if (!res || !res.success) return;
                     const datos = (res.datos || []).map((f) => {
                         const archivo = f.ARCHIVO || "";
-                        const idImp = f.ID_IMPORTACION != null ? f.ID_IMPORTACION : "";
-                        const btn = "<button type='button' class='btn btn-info btn-xs btn-ver-importacion' " +
+                        const idLote = f.ID_LOTE_IMPORTACION != null ? f.ID_LOTE_IMPORTACION : (f.ID_IMPORTACION != null ? f.ID_IMPORTACION : "");
+                        const puedeEliminar = parseInt(f.PUEDE_ELIMINAR, 10) === 1;
+                        const btnVer = "<button type='button' class='btn btn-info btn-xs btn-ver-importacion' " +
                             "data-archivo='" + String(archivo).replace(/'/g, "&#39;") + "' " +
-                            "data-id='" + idImp + "' title='Ver registros'>" +
+                            "data-id='" + idLote + "' title='Ver registros'>" +
                             "<i class='fa fa-list'></i> Ver</button>";
+                        const btnEliminar = puedeEliminar
+                            ? " <button type='button' class='btn btn-danger btn-xs btn-eliminar-importacion' " +
+                              "data-archivo='" + String(archivo).replace(/'/g, "&#39;") + "' " +
+                              "data-id='" + idLote + "' title='Eliminar archivo'>" +
+                              "<i class='fa fa-trash'></i> Eliminar</button>"
+                            : "";
                         return [
                             archivo || "-",
                             f.FECHA_PAGO || "-",
                             f.REGISTROS || 0,
                             formateaMoneda(f.MONTO_TOTAL),
                             f.INCIDENCIAS || 0,
-                            f.F_IMPORTACION || "-",
-                            btn
+                            f.FECHA_CARGA || f.F_IMPORTACION || "-",
+                            btnVer + btnEliminar
                         ];
                     });
                     actualizaDatosTabla(idTablaHistorial, datos);
                 });
             };
 
-            const verDetalleImportacion = (archivo, idImportacion) => {
+            const verDetalleImportacion = (archivo, idLote) => {
                 if (!archivo) return showWarning("No se pudo identificar el archivo.");
                 swal({ text: "Cargando registros...", icon: "/img/wait.gif", button: false, closeOnClickOutside: false, closeOnEsc: false });
-                $.getJSON("/Pagos/DetalleImportacion/", { archivo: archivo, id_importacion: idImportacion || "" }, (res) => {
+                $.getJSON("/Pagos/DetalleImportacion/", { archivo: archivo, id_lote_importacion: idLote || "" }, (res) => {
                     swal.close();
                     if (!res.success) return showError(res.mensaje || "No se pudieron cargar los registros.");
                     const data = res.datos || {};
                     const filas = data.registros || [];
                     $("#detalle_archivo_nombre").text(data.archivo || archivo);
                     $("#detalle_resumen").text(" · " + (data.total || filas.length) + " registro(s)");
+                    renderDesglosePreview(filas, "#desglose-detalle-fechas");
                     const datos = filas.map((f) => {
                         const estatus = parseInt(f.INCIDENCIA, 10) === 1
-                            ? "<span class='badge-revisar'>Revisar</span>"
+                            ? "<span class='badge-revisar'>Incidencia</span>"
                             : "<span class='badge-ok'>OK</span>";
                         return [
                             f.FECHA_FMT || f.FECHA || "-",
@@ -121,6 +183,26 @@ class Pagos extends Controller
                     actualizaDatosTabla(idTablaDetalle, datos);
                     $("#modalDetalleImportacion").modal("show");
                 }).fail(() => { swal.close(); showError("Error al consultar el detalle."); });
+            };
+
+            const eliminarImportacion = async (archivo, idLote) => {
+                if (!archivo) return showWarning("No se pudo identificar el archivo.");
+                const ok = await confirmarMovimiento(
+                    "Eliminar importación",
+                    "Se eliminarán todos los pagos del archivo \"" + archivo + "\". Solo es posible si ninguno fue procesado en el cierre. ¿Desea continuar?"
+                );
+                if (!ok) return;
+
+                consultaServidor("/Pagos/EliminarImportacion/", {
+                    archivo: archivo,
+                    id_lote_importacion: idLote || ""
+                }, (res) => {
+                    if (!res.success) return showError(res.mensaje || "No se pudo eliminar.");
+                    showSuccess(res.mensaje).then(() => {
+                        cargarHistorial();
+                        cargarIncidencias();
+                    });
+                });
             };
 
             const cargarIncidencias = () => {
@@ -176,8 +258,9 @@ class Pagos extends Controller
                             if (dup) resumen += " · " + dup + " duplicado" + (dup === 1 ? "" : "s");
                             $("#resumen-preview").text(resumen);
                             renderPreview(data.filas || []);
-                            $("#panel-preview").show();
+                            renderDesglosePreview(data.filas || []);
                             $("#btn_confirmar").prop("disabled", !res.success || dup > 0);
+                            $("#modalPreviewImportacion").modal("show");
                         }
                         if (!res.success) {
                             return showError(res.mensaje || "No se pudo leer el archivo.");
@@ -222,7 +305,7 @@ class Pagos extends Controller
                         if (!res.success) return showError(res.mensaje || "No se pudo importar.");
                         showSuccess(res.mensaje).then(() => {
                             $("#archivo_layout").val("");
-                            $("#panel-preview").hide();
+                            $("#modalPreviewImportacion").modal("hide");
                             previewActual = null;
                             $("#btn_confirmar").prop("disabled", true);
                             cargarHistorial();
@@ -264,6 +347,15 @@ class Pagos extends Controller
 
                 $(document).on("click", ".btn-ver-importacion", function () {
                     verDetalleImportacion($(this).data("archivo"), $(this).data("id"));
+                });
+
+                $(document).on("click", ".btn-eliminar-importacion", function () {
+                    eliminarImportacion($(this).data("archivo"), $(this).data("id"));
+                });
+
+                $("#modalPreviewImportacion").on("shown.bs.modal", function () {
+                    const dt = $("#" + idTablaPreview).DataTable();
+                    if (dt) dt.columns.adjust();
                 });
 
                 $("#modalDetalleImportacion").on("shown.bs.modal", function () {
@@ -366,7 +458,15 @@ class Pagos extends Controller
     {
         echo json_encode(ImportacionPagosService::detalleImportacion([
             'archivo' => $_GET['archivo'] ?? ($_POST['archivo'] ?? ''),
-            'id_importacion' => $_GET['id_importacion'] ?? ($_POST['id_importacion'] ?? null),
+            'id_lote_importacion' => $_GET['id_lote_importacion'] ?? ($_POST['id_lote_importacion'] ?? ($_GET['id_importacion'] ?? ($_POST['id_importacion'] ?? null))),
+        ]));
+    }
+
+    public function EliminarImportacion()
+    {
+        echo json_encode(ImportacionPagosService::eliminarImportacion([
+            'archivo' => $_POST['archivo'] ?? ($_GET['archivo'] ?? ''),
+            'id_lote_importacion' => $_POST['id_lote_importacion'] ?? ($_GET['id_lote_importacion'] ?? null),
         ]));
     }
 

@@ -114,7 +114,7 @@ class ImportacionPagosService
             );
         }
 
-        $idImportacion = $repo->siguienteIdImportacion();
+        $idLote = $repo->siguienteIdLoteImportacion();
         $db = new Database();
         if ($db->db_activa === null) {
             return Model::Responde(false, 'No hay conexión a la base de datos.');
@@ -136,7 +136,7 @@ class ImportacionPagosService
                     'CDGOCPE' => $fila['CDGOCPE'] ?? ' ',
                     'REFERENCIA' => $fila['REFERENCIA'],
                     'ARCHIVO' => $nombreArchivo,
-                    'ID_IMPORTACION' => $idImportacion,
+                    'ID_LOTE_IMPORTACION' => $idLote,
                     'INCIDENCIA' => !empty($fila['INCIDENCIA']) ? 1 : 0,
                 ];
 
@@ -169,7 +169,7 @@ class ImportacionPagosService
         return Model::Responde(true, $mensaje, [
             'insertados' => $insertados,
             'incidencias' => $incidencias,
-            'id_importacion' => $idImportacion,
+            'id_lote_importacion' => $idLote,
             'archivo' => $nombreArchivo,
         ]);
     }
@@ -198,18 +198,44 @@ class ImportacionPagosService
     public static function detalleImportacion(array $datos): array
     {
         $archivo = trim((string) ($datos['archivo'] ?? ''));
-        $idImportacion = $datos['id_importacion'] ?? null;
+        $idLote = $datos['id_lote_importacion'] ?? ($datos['id_importacion'] ?? null);
         if ($archivo === '') {
             return Model::Responde(false, 'Archivo requerido.');
         }
 
         $repo = new ImportacionPagosRepository();
-        $filas = $repo->listarDetalleImportacion($archivo, $idImportacion);
+        $filas = $repo->listarDetalleImportacion($archivo, $idLote);
         return Model::Responde(true, 'OK', [
             'archivo' => $archivo,
-            'id_importacion' => $idImportacion,
+            'id_lote_importacion' => $idLote,
             'registros' => $filas,
             'total' => count($filas),
+        ]);
+    }
+
+    /**
+     * Elimina un archivo importado si ningún pago fue procesado en cierre.
+     *
+     * @return array Respuesta Model::Responde
+     */
+    public static function eliminarImportacion(array $datos): array
+    {
+        $archivo = trim((string) ($datos['archivo'] ?? ''));
+        $idLote = $datos['id_lote_importacion'] ?? ($datos['id_importacion'] ?? null);
+        if ($archivo === '') {
+            return Model::Responde(false, 'Archivo requerido.');
+        }
+
+        $repo = new ImportacionPagosRepository();
+        $resultado = $repo->eliminarLoteImportacion($archivo, $idLote);
+        if (empty($resultado['ok'])) {
+            return Model::Responde(false, $resultado['mensaje'] ?? 'No se pudo eliminar.');
+        }
+
+        return Model::Responde(true, $resultado['mensaje'], [
+            'eliminados' => $resultado['eliminados'] ?? 0,
+            'archivo' => $archivo,
+            'id_lote_importacion' => $idLote,
         ]);
     }
 
@@ -236,7 +262,12 @@ class ImportacionPagosService
             return Model::Responde(false, 'No existe un crédito entregado con los datos proporcionados.');
         }
 
-        $referencia = $repo->generarReferencia($credito, $ciclo);
+        $cdgtpc = trim((string) ($prn['CDGTPC'] ?? ''));
+        if ($cdgtpc === '') {
+            return Model::Responde(false, 'El crédito no tiene tipo de producto (CDGTPC) para generar la referencia.');
+        }
+
+        $referencia = $repo->generarReferencia($credito, $cdgtpc);
         if ($referencia === null) {
             return Model::Responde(false, 'No se pudo generar la referencia de pago.');
         }
@@ -249,6 +280,7 @@ class ImportacionPagosService
         return Model::Responde(true, 'Incidencia corregida correctamente.', [
             'credito' => $credito,
             'ciclo' => $ciclo,
+            'cdgtpc' => $cdgtpc,
             'referencia' => $referencia,
         ]);
     }
