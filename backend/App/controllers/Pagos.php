@@ -125,6 +125,43 @@ class Pagos extends Controller
                     .show();
             };
 
+            const renderCeldaMulti = (desglose, campo, fallbackHtml, formatear) => {
+                const dias = Array.isArray(desglose) ? desglose : [];
+                if (dias.length <= 1) {
+                    return fallbackHtml;
+                }
+                const lineas = dias.map((d) => {
+                    let valor = d[campo];
+                    if (typeof formatear === "function") {
+                        valor = formatear(valor);
+                    }
+                    return '<div class="ci-multi-line">' + (valor == null || valor === "" ? "-" : valor) + "</div>";
+                }).join("");
+                return '<div class="ci-multi-stack">' + lineas + "</div>";
+            };
+
+            const renderReferenciaDetalle = (f) => {
+                const actual = (f.REFERENCIA || f.referencia || "-").toString();
+                const original = (f.REFERENCIA_ORIGINAL || f.referencia_original || "").toString().trim();
+                const quien = (f.CDGPE_CORRIGE || f.cdgpe_corrige || "").toString().trim();
+                const cuando = (f.F_CORRIGE_REF_FMT || f.f_corrige_ref_fmt || "").toString().trim();
+                const huboCorreccion = quien !== "" || cuando !== "" || (original !== "" && original !== actual);
+
+                let html = '<div class="ci-ref-cell">';
+                html += '<div class="ci-ref-nueva">' + actual + "</div>";
+                if (huboCorreccion && original !== "" && original !== actual) {
+                    html += '<div class="ci-ref-ant">Original: ' + original + "</div>";
+                }
+                if (quien !== "" || cuando !== "") {
+                    html += '<div class="ci-ref-meta">Corregido'
+                        + (quien ? " por " + quien : "")
+                        + (cuando ? " · " + cuando : "")
+                        + "</div>";
+                }
+                html += "</div>";
+                return html;
+            };
+
             const cargarHistorial = () => {
                 $.getJSON("/Pagos/ListarHistorial/", (res) => {
                     if (!res || !res.success) return;
@@ -132,6 +169,8 @@ class Pagos extends Controller
                         const archivo = f.ARCHIVO || "";
                         const idLote = f.ID_LOTE_IMPORTACION != null ? f.ID_LOTE_IMPORTACION : (f.ID_IMPORTACION != null ? f.ID_IMPORTACION : "");
                         const puedeEliminar = parseInt(f.PUEDE_ELIMINAR, 10) === 1;
+                        const desglose = f.DESGLOSE || [];
+                        const multi = desglose.length > 1 || parseInt(f.NUM_FECHAS, 10) > 1;
                         const btnVer = "<button type='button' class='btn btn-info btn-xs btn-ver-importacion' " +
                             "data-archivo='" + String(archivo).replace(/'/g, "&#39;") + "' " +
                             "data-id='" + idLote + "' title='Ver registros'>" +
@@ -142,12 +181,21 @@ class Pagos extends Controller
                               "data-id='" + idLote + "' title='Eliminar archivo'>" +
                               "<i class='fa fa-trash'></i> Eliminar</button>"
                             : "";
+                        const fechaHtml = multi
+                            ? renderCeldaMulti(desglose, "FECHA_FMT", '<span class="ci-multi-label">Múltiples fechas</span>')
+                            : (f.FECHA_PAGO || "-");
+                        const registrosHtml = multi
+                            ? renderCeldaMulti(desglose, "REGISTROS", f.REGISTROS || 0)
+                            : (f.REGISTROS || 0);
+                        const incidenciasHtml = multi
+                            ? renderCeldaMulti(desglose, "INCIDENCIAS", f.INCIDENCIAS || 0)
+                            : (f.INCIDENCIAS || 0);
                         return [
                             archivo || "-",
-                            f.FECHA_PAGO || "-",
-                            f.REGISTROS || 0,
+                            fechaHtml,
+                            registrosHtml,
                             formateaMoneda(f.MONTO_TOTAL),
-                            f.INCIDENCIAS || 0,
+                            incidenciasHtml,
                             f.FECHA_CARGA || f.F_IMPORTACION || "-",
                             btnVer + btnEliminar
                         ];
@@ -173,7 +221,7 @@ class Pagos extends Controller
                             : "<span class='badge-ok'>OK</span>";
                         return [
                             f.FECHA_FMT || f.FECHA || "-",
-                            '<span class="celda-principal">' + (f.REFERENCIA || "-") + "</span>",
+                            renderReferenciaDetalle(f),
                             '<span class="celda-principal">' + (f.CDGNS || "-") + "</span>",
                             f.CICLO || "-",
                             formateaMoneda(f.MONTO),
@@ -211,7 +259,10 @@ class Pagos extends Controller
                     const datos = (res.datos || []).map((f) => {
                         const btn = "<button type='button' class='btn btn-warning btn-xs btn-corregir' " +
                             "data-fecha='" + (f.FECHA || "") + "' data-secuencia='" + (f.SECUENCIA || "") + "' " +
-                            "data-referencia='" + (f.REFERENCIA || "") + "' data-monto='" + (f.MONTO || "") + "'>" +
+                            "data-referencia='" + String(f.REFERENCIA || "").replace(/'/g, "&#39;") + "' " +
+                            "data-monto='" + (f.MONTO || "") + "' " +
+                            "data-archivo='" + String(f.ARCHIVO || "").replace(/'/g, "&#39;") + "' " +
+                            "data-id='" + (f.ID_LOTE_IMPORTACION != null ? f.ID_LOTE_IMPORTACION : "") + "'>" +
                             "<i class='fa fa-edit'></i> Corregir</button>";
                         return [
                             f.FECHA_FMT || f.FECHA || "-",
@@ -377,13 +428,18 @@ class Pagos extends Controller
                     const secuencia = $(this).data("secuencia");
                     const referencia = $(this).data("referencia");
                     const monto = $(this).data("monto");
+                    const archivo = $(this).data("archivo") || "";
+                    const idLote = $(this).data("id") || "";
                     $("#corr_fecha").val(fecha);
                     $("#corr_secuencia").val(secuencia);
                     $("#corr_referencia").text(referencia);
                     $("#corr_monto").text(formateaMoneda(monto));
                     $("#corr_credito").val("");
                     $("#corr_ciclo").val("");
-                    $("#modalCorregirIncidencia").modal("show");
+                    $("#modalCorregirIncidencia")
+                        .data("archivo", archivo)
+                        .data("id-lote", idLote)
+                        .modal("show");
                 });
 
                 $("#btn_guardar_correccion").click(async () => {
@@ -472,7 +528,9 @@ class Pagos extends Controller
 
     public function CorregirIncidencia()
     {
-        echo json_encode(ImportacionPagosService::corregirIncidencia($_POST));
+        $datos = $_POST;
+        $datos['usuario'] = $this->__usuario;
+        echo json_encode(ImportacionPagosService::corregirIncidencia($datos));
     }
 
     /**

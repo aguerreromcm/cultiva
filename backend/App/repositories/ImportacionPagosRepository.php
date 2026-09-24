@@ -232,7 +232,7 @@ class ImportacionPagosRepository
             INSERT INTO PAGOSDIA (
                 CDGEM, CDGNS, CICLO, SECUENCIA, FECHA, MONTO, TIPO, ESTATUS,
                 FREGISTRO, CDGPE, NOMBRE, CDGOCPE, EJECUTIVO,
-                REFERENCIA, ARCHIVO, ID_LOTE_IMPORTACION, INCIDENCIA
+                REFERENCIA, REFERENCIA_ORIGINAL, ARCHIVO, ID_LOTE_IMPORTACION, INCIDENCIA
             ) VALUES (
                 'EMPFIN',
                 :cdgns,
@@ -248,11 +248,18 @@ class ImportacionPagosRepository
                 :cdgocpe,
                 NVL((SELECT GET_NOMBRE_EMPLEADO(:cdgocpe_nom) FROM DUAL), ' '),
                 :referencia,
+                :referencia_original,
                 :archivo,
                 :id_lote,
                 :incidencia
             )
         SQL;
+
+        $ref = (string) ($pago['REFERENCIA'] ?? '');
+        $refOrig = trim((string) ($pago['REFERENCIA_ORIGINAL'] ?? ''));
+        if ($refOrig === '') {
+            $refOrig = $ref;
+        }
 
         return $db->insert($sql, [
             'cdgns' => $pago['CDGNS'],
@@ -264,7 +271,8 @@ class ImportacionPagosRepository
             'cdgns_nombre' => $pago['CDGNS'],
             'cdgocpe' => $pago['CDGOCPE'] ?? ' ',
             'cdgocpe_nom' => $pago['CDGOCPE'] ?? ' ',
-            'referencia' => $pago['REFERENCIA'],
+            'referencia' => $ref,
+            'referencia_original' => $refOrig,
             'archivo' => $pago['ARCHIVO'],
             'id_lote' => $pago['ID_LOTE_IMPORTACION'],
             'incidencia' => $pago['INCIDENCIA'] ?? 0,
@@ -348,11 +356,14 @@ class ImportacionPagosRepository
                 CICLO,
                 MONTO,
                 REFERENCIA,
+                REFERENCIA_ORIGINAL,
                 NVL(INCIDENCIA, 0) AS INCIDENCIA,
                 ARCHIVO,
                 ID_LOTE_IMPORTACION,
                 ID_IMPORTACION,
-                F_IMPORTACION
+                F_IMPORTACION,
+                CDGPE_CORRIGE,
+                TO_CHAR(F_CORRIGE_REF, 'DD/MM/YYYY HH24:MI:SS') AS F_CORRIGE_REF_FMT
             FROM PAGOSDIA
             WHERE CDGEM = 'EMPFIN'
               AND ESTATUS = 'A'
@@ -385,6 +396,7 @@ class ImportacionPagosRepository
                 ARCHIVO,
                 ID_LOTE_IMPORTACION,
                 MIN(TO_CHAR(FECHA, 'DD/MM/YYYY')) AS FECHA_PAGO,
+                COUNT(DISTINCT TRUNC(FECHA)) AS NUM_FECHAS,
                 COUNT(*) AS REGISTROS,
                 SUM(MONTO) AS MONTO_TOTAL,
                 SUM(CASE WHEN INCIDENCIA = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS,
@@ -402,9 +414,56 @@ class ImportacionPagosRepository
             ORDER BY MAX(FREGISTRO) DESC
         SQL;
 
+        $sqlDesglose = <<<SQL
+            SELECT
+                ARCHIVO,
+                ID_LOTE_IMPORTACION,
+                TO_CHAR(TRUNC(PD.FECHA), 'YYYY-MM-DD') AS FECHA_ISO,
+                TO_CHAR(TRUNC(PD.FECHA), 'DD/MM/YYYY') AS FECHA_FMT,
+                COUNT(*) AS REGISTROS,
+                SUM(PD.MONTO) AS MONTO,
+                SUM(CASE WHEN NVL(PD.INCIDENCIA, 0) = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS
+            FROM PAGOSDIA PD
+            WHERE PD.ARCHIVO IS NOT NULL
+            GROUP BY ARCHIVO, ID_LOTE_IMPORTACION, TRUNC(PD.FECHA)
+            ORDER BY TRUNC(PD.FECHA)
+        SQL;
+
         try {
             $filas = $db->queryAll($sql);
-            return is_array($filas) ? $filas : [];
+            if (!is_array($filas) || $filas === []) {
+                return [];
+            }
+
+            $desgloseRaw = $db->queryAll($sqlDesglose);
+            $mapa = [];
+            // Si el desglose falla, queryAll devuelve [] y el historial igual se muestra.
+            if (is_array($desgloseRaw) && $desgloseRaw !== []) {
+                foreach ($desgloseRaw as $d) {
+                    $key = ((string) ($d['ARCHIVO'] ?? '')) . '|' . ((string) ($d['ID_LOTE_IMPORTACION'] ?? ''));
+                    $mapa[$key][] = [
+                        'FECHA' => $d['FECHA_ISO'] ?? ($d['FECHA'] ?? ''),
+                        'FECHA_FMT' => $d['FECHA_FMT'] ?? '',
+                        'REGISTROS' => (int) ($d['REGISTROS'] ?? 0),
+                        'MONTO' => (float) ($d['MONTO'] ?? 0),
+                        'INCIDENCIAS' => (int) ($d['INCIDENCIAS'] ?? 0),
+                    ];
+                }
+            }
+
+            foreach ($filas as &$fila) {
+                $key = ((string) ($fila['ARCHIVO'] ?? '')) . '|' . ((string) ($fila['ID_LOTE_IMPORTACION'] ?? ''));
+                $fila['DESGLOSE'] = $mapa[$key] ?? [];
+                $numFechas = (int) ($fila['NUM_FECHAS'] ?? count($fila['DESGLOSE']));
+                if ($numFechas > 1) {
+                    if (empty($fila['DESGLOSE'])) {
+                        $fila['FECHA_PAGO'] = 'Múltiples fechas';
+                    }
+                }
+            }
+            unset($fila);
+
+            return $filas;
         } catch (\Throwable $e) {
             return [];
         }
@@ -526,22 +585,32 @@ class ImportacionPagosRepository
         string $credito,
         string $ciclo,
         string $referencia,
-        string $cdgocpe
+        string $cdgocpe,
+        string $usuarioCorrige = ''
     ): bool {
         $db = new Database();
         if ($db->db_activa === null) {
             return false;
         }
 
+        $usuarioCorrige = trim($usuarioCorrige);
+        if ($usuarioCorrige === '') {
+            $usuarioCorrige = ' ';
+        }
+
+        // Conserva REFERENCIA_ORIGINAL del layout; si aún es null, usa la referencia actual.
         $sql = <<<SQL
             UPDATE PAGOSDIA
             SET CDGNS = :credito,
                 CICLO = :ciclo,
+                REFERENCIA_ORIGINAL = NVL(REFERENCIA_ORIGINAL, REFERENCIA),
                 REFERENCIA = :referencia,
                 CDGOCPE = :cdgocpe,
                 NOMBRE = NVL((SELECT NOMBRE FROM NS WHERE CDGEM = 'EMPFIN' AND CODIGO = :credito_ns), 'SIN IDENTIFICAR'),
                 EJECUTIVO = NVL((SELECT GET_NOMBRE_EMPLEADO(:cdgocpe_nom) FROM DUAL), ' '),
                 INCIDENCIA = 0,
+                CDGPE_CORRIGE = :usuario_corrige,
+                F_CORRIGE_REF = SYSDATE,
                 FACTUALIZA = SYSDATE
             WHERE TRUNC(FECHA) = TO_DATE(:fecha, 'YYYY-MM-DD')
               AND SECUENCIA = :secuencia
@@ -555,6 +624,7 @@ class ImportacionPagosRepository
             'cdgocpe' => $cdgocpe,
             'credito_ns' => $credito,
             'cdgocpe_nom' => $cdgocpe,
+            'usuario_corrige' => $usuarioCorrige,
             'fecha' => substr($fecha, 0, 10),
             'secuencia' => $secuencia,
         ]);

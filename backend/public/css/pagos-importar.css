@@ -387,6 +387,25 @@
     opacity: 0.7;
 }
 
+/* Auditoría de referencia en detalle (modal fuera de .pagos-import-page) */
+.ci-ref-cell {
+    line-height: 1.35;
+}
+
+.ci-ref-nueva {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.ci-ref-ant,
+.ci-ref-meta {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.75;
+    margin-top: 2px;
+}
+
 .pagos-import-page .badge-vigente {
     display: inline-block;
     padding: 3px 10px;
@@ -1014,6 +1033,25 @@
 .ci-desglose-tabla tr.has-incidencias td.num:last-child {
     color: #d97706;
     font-weight: 700;
+}
+
+/* Desglose multi-fecha en tabla historial */
+.ci-multi-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.ci-multi-line {
+    font-size: 12px;
+}
+
+.ci-multi-label {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.85;
 }
 
 @media (prefers-color-scheme: dark) {

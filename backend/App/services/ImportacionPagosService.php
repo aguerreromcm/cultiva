@@ -135,6 +135,7 @@ class ImportacionPagosService
                     'CDGPE' => $usuario,
                     'CDGOCPE' => $fila['CDGOCPE'] ?? ' ',
                     'REFERENCIA' => $fila['REFERENCIA'],
+                    'REFERENCIA_ORIGINAL' => $fila['REFERENCIA_ORIGINAL'] ?? $fila['REFERENCIA'],
                     'ARCHIVO' => $nombreArchivo,
                     'ID_LOTE_IMPORTACION' => $idLote,
                     'INCIDENCIA' => !empty($fila['INCIDENCIA']) ? 1 : 0,
@@ -251,6 +252,7 @@ class ImportacionPagosService
         $credito = str_pad(preg_replace('/\D/', '', (string) ($datos['credito'] ?? '')), 6, '0', STR_PAD_LEFT);
         $ciclo = trim((string) ($datos['ciclo'] ?? ''));
         $ciclo = str_pad(preg_replace('/\D/', '', $ciclo), 2, '0', STR_PAD_LEFT);
+        $usuario = trim((string) ($datos['usuario'] ?? ''));
 
         if ($fecha === '' || $secuencia === '' || $credito === '' || $ciclo === '') {
             return Model::Responde(false, 'Fecha, secuencia, crédito y ciclo son obligatorios.');
@@ -273,7 +275,7 @@ class ImportacionPagosService
         }
 
         $cdgocpe = trim((string) ($prn['CDGOCPE'] ?? ' '));
-        if (!$repo->corregirIncidencia($fecha, $secuencia, $credito, $ciclo, $referencia, $cdgocpe)) {
+        if (!$repo->corregirIncidencia($fecha, $secuencia, $credito, $ciclo, $referencia, $cdgocpe, $usuario)) {
             return Model::Responde(false, 'No se pudo actualizar el registro.');
         }
 
