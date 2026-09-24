@@ -107,8 +107,14 @@ class Pagos extends Controller
                     )
                 );
                 const tbody = $("<tbody>");
+                let totReg = 0;
+                let totMonto = 0;
+                let totInc = 0;
                 dias.forEach((d) => {
                     const row = mapa[d];
+                    totReg += row.registros;
+                    totMonto += row.monto;
+                    totInc += row.incidencias;
                     const tr = $("<tr>");
                     if (row.incidencias > 0) tr.addClass("has-incidencias");
                     tr.append($("<td>").text(row.etiqueta));
@@ -117,6 +123,14 @@ class Pagos extends Controller
                     tr.append($("<td>").addClass("num").text(row.incidencias));
                     tbody.append(tr);
                 });
+
+                const trTot = $("<tr>").addClass("ci-desglose-total");
+                if (totInc > 0) trTot.addClass("has-incidencias");
+                trTot.append($("<td>").text("Total"));
+                trTot.append($("<td>").addClass("num").text(totReg));
+                trTot.append($("<td>").addClass("num").text(formateaMoneda(totMonto)));
+                trTot.append($("<td>").addClass("num").text(totInc));
+                tbody.append(trTot);
                 tabla.append(tbody);
 
                 box.empty()
@@ -187,6 +201,9 @@ class Pagos extends Controller
                         const registrosHtml = multi
                             ? renderCeldaMulti(desglose, "REGISTROS", f.REGISTROS || 0)
                             : (f.REGISTROS || 0);
+                        const montoHtml = multi
+                            ? renderCeldaMulti(desglose, "MONTO", formateaMoneda(f.MONTO_TOTAL), formateaMoneda)
+                            : formateaMoneda(f.MONTO_TOTAL);
                         const incidenciasHtml = multi
                             ? renderCeldaMulti(desglose, "INCIDENCIAS", f.INCIDENCIAS || 0)
                             : (f.INCIDENCIAS || 0);
@@ -194,7 +211,7 @@ class Pagos extends Controller
                             archivo || "-",
                             fechaHtml,
                             registrosHtml,
-                            formateaMoneda(f.MONTO_TOTAL),
+                            montoHtml,
                             incidenciasHtml,
                             f.FECHA_CARGA || f.F_IMPORTACION || "-",
                             btnVer + btnEliminar
@@ -212,9 +229,18 @@ class Pagos extends Controller
                     if (!res.success) return showError(res.mensaje || "No se pudieron cargar los registros.");
                     const data = res.datos || {};
                     const filas = data.registros || [];
+                    let montoTotal = 0;
+                    let incidencias = 0;
+                    filas.forEach((f) => {
+                        montoTotal += parseFloat(f.MONTO) || 0;
+                        if (parseInt(f.INCIDENCIA, 10) === 1) incidencias++;
+                    });
                     $("#detalle_archivo_nombre").text(data.archivo || archivo);
-                    $("#detalle_resumen").text(" · " + (data.total || filas.length) + " registro(s)");
-                    renderDesglosePreview(filas, "#desglose-detalle-fechas");
+                    let resumen = " · Monto total: " + formateaMoneda(montoTotal);
+                    if (incidencias > 0) {
+                        resumen += " · " + incidencias + " incidencia" + (incidencias === 1 ? "" : "s");
+                    }
+                    $("#detalle_resumen").text(resumen);
                     const datos = filas.map((f) => {
                         const estatus = parseInt(f.INCIDENCIA, 10) === 1
                             ? "<span class='badge-revisar'>Incidencia</span>"
@@ -303,8 +329,9 @@ class Pagos extends Controller
                             previewActual = data;
                             const inc = data.incidencias || 0;
                             const dup = data.duplicados || 0;
-                            const total = data.total || 0;
-                            let resumen = total + " registro" + (total === 1 ? "" : "s");
+                            let montoTotal = 0;
+                            (data.filas || []).forEach((f) => { montoTotal += parseFloat(f.MONTO) || 0; });
+                            let resumen = "Monto total: " + formateaMoneda(montoTotal);
                             if (inc) resumen += " · " + inc + " incidencia" + (inc === 1 ? "" : "s");
                             if (dup) resumen += " · " + dup + " duplicado" + (dup === 1 ? "" : "s");
                             $("#resumen-preview").text(resumen);

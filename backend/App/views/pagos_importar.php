@@ -76,7 +76,7 @@
                                     <th>Archivo</th>
                                     <th>Fecha pago</th>
                                     <th>Registros</th>
-                                    <th>Monto total</th>
+                                    <th>Monto</th>
                                     <th>Incidencias</th>
                                     <th>Fecha de importación</th>
                                     <th>Acción</th>
@@ -160,7 +160,6 @@
                     Archivo: <strong id="detalle_archivo_nombre"></strong>
                     <span id="detalle_resumen" class="text-muted"></span>
                 </p>
-                <div id="desglose-detalle-fechas" class="ci-desglose-fechas" style="display: none;"></div>
                 <table class="table table-striped table-bordered table-hover" id="tabla-detalle-importacion">
                     <thead>
                         <tr>
