@@ -717,6 +717,24 @@ class ImportacionPagosParser
         return substr($token, 1, 6);
     }
 
+    /**
+     * Tipo de movimiento en PAGOSDIA: 'G' para referencias de comisión/garantía
+     * ('0' en PAYCASH/BanCoppel, '1100000000000' en OXXO), 'P' para pago.
+     */
+    public static function tipoMovimiento(string $corresponsal, string $referencia): string
+    {
+        $corresponsal = strtoupper(trim($corresponsal));
+        $referencia = trim($referencia);
+
+        if ($corresponsal === self::CORRESPONSAL_OXXO) {
+            $soloDigitos = preg_replace('/\D/', '', $referencia);
+            return ($soloDigitos !== null && strlen($soloDigitos) >= 19 && $soloDigitos[12] === '0') ? 'G' : 'P';
+        }
+
+        $token = preg_split('/\s+/', strtoupper($referencia))[0] ?? '';
+        return (self::referenciaPaycashValida($token) && $token[0] === '0') ? 'G' : 'P';
+    }
+
     public static function referenciaPaycashValida(string $referencia): bool
     {
         $referencia = trim($referencia);
