@@ -26,6 +26,10 @@ class ImportacionPagosService
             return Model::Responde(false, 'Este archivo ya fue importado anteriormente: ' . $nombreArchivo, null, 'Archivo duplicado');
         }
 
+        if ($repo->cuentaCorresponsal($corresponsal) === null) {
+            return Model::Responde(false, 'No se encontró la cuenta bancaria del corresponsal ' . strtoupper($corresponsal) . '.');
+        }
+
         $parseo = ImportacionPagosParser::parsear($rutaTmp, $nombreArchivo, $corresponsal);
         if (empty($parseo['success'])) {
             return Model::Responde(false, $parseo['mensaje'] ?? 'Error al leer el archivo.', null, $parseo['error'] ?? null);
@@ -88,6 +92,11 @@ class ImportacionPagosService
             return Model::Responde(false, 'Este archivo ya fue importado anteriormente.', null, 'Archivo duplicado');
         }
 
+        $cdgcb = $repo->cuentaCorresponsal($corresponsal);
+        if ($cdgcb === null) {
+            return Model::Responde(false, 'No se encontró la cuenta bancaria del corresponsal ' . strtoupper($corresponsal) . '.');
+        }
+
         $parseo = ImportacionPagosParser::parsear($rutaTmp, $nombreArchivo, $corresponsal);
         if (empty($parseo['success'])) {
             return Model::Responde(false, $parseo['mensaje'] ?? 'Error al leer el archivo.', null, $parseo['error'] ?? null);
@@ -140,6 +149,7 @@ class ImportacionPagosService
                     'ARCHIVO' => $nombreArchivo,
                     'ID_LOTE_IMPORTACION' => $idLote,
                     'INCIDENCIA' => !empty($fila['INCIDENCIA']) ? 1 : 0,
+                    'CDGCB' => $cdgcb,
                 ];
 
                 if (!$repo->insertarPago($pago, $db)) {
@@ -260,6 +270,17 @@ class ImportacionPagosService
         }
 
         $repo = new ImportacionPagosRepository();
+        $estado = $repo->estadoPago($fecha, $secuencia);
+        if ($estado === null) {
+            return Model::Responde(false, 'El registro no existe.');
+        }
+        if ($estado['PROCESADO'] === 1) {
+            return Model::Responde(false, 'La incidencia ya fue procesada en el cierre y no se puede corregir.');
+        }
+        if ($estado['INCIDENCIA'] !== 1) {
+            return Model::Responde(false, 'El registro ya no es una incidencia.');
+        }
+
         $prn = $repo->validarCreditoCicloEntregado($credito, $ciclo);
         if ($prn === null) {
             return Model::Responde(false, 'No existe un crédito entregado con los datos proporcionados.');
@@ -307,15 +328,27 @@ class ImportacionPagosService
             $incidencia = false;
             $motivo = '';
             $credito = null;
+            $ciclo = null;
+            $referencia = null;
+            $creditoPorPdi = false;
 
             if ($esPaycash) {
                 $refNorm = ImportacionPagosParser::normalizarReferenciaPaycash($refOriginal);
-                if (!ImportacionPagosParser::referenciaPaycashValida($refNorm)) {
+                $esTransferencia = $corresponsal === ImportacionPagosParser::CORRESPONSAL_BANCOPPEL
+                    && ImportacionPagosParser::esReferenciaTransferencia($refOriginal);
+                $creditoPdi = $esTransferencia ? $repo->creditoDesdePdi($refOriginal) : null;
+
+                if ($creditoPdi !== null) {
+                    $credito = $creditoPdi;
+                    $creditoPorPdi = true;
+                } elseif (!ImportacionPagosParser::referenciaPaycashValida($refNorm)) {
                     $credito = '000000';
                     $ciclo = '00';
                     $referencia = $refOriginal;
                     $incidencia = true;
-                    $motivo = 'Referencia inválida (debe ser 10 caracteres e iniciar con P, C, 0 o 1).';
+                    $motivo = $esTransferencia
+                        ? 'Transferencia sin un crédito único registrado en PDI.'
+                        : 'Referencia inválida (debe ser 10 caracteres e iniciar con P, C, 0 o 1).';
                 } else {
                     $credito = ImportacionPagosParser::extraerCredito($corresponsal, $refNorm);
                     $referencia = $refNorm;
@@ -336,6 +369,16 @@ class ImportacionPagosService
                 } else {
                     $ciclo = str_pad(preg_replace('/\D/', '', (string) $prn['CICLO']), 2, '0', STR_PAD_LEFT);
                     $cdgocpe = trim((string) ($prn['CDGOCPE'] ?? ' '));
+                    if ($creditoPorPdi) {
+                        $referencia = $repo->generarReferencia($credito, (string) ($prn['CDGTPC'] ?? ''));
+                        if ($referencia === null) {
+                            $credito = '000000';
+                            $ciclo = '00';
+                            $cdgocpe = ' ';
+                            $incidencia = true;
+                            $motivo = 'No se pudo generar la referencia del crédito encontrado en PDI.';
+                        }
+                    }
                 }
             }
 

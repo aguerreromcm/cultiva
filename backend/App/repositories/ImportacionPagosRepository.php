@@ -109,6 +109,74 @@ class ImportacionPagosRepository
         }
     }
 
+    /**
+     * Cuenta bancaria (CB.CODIGO) del corresponsal según el nombre de su institución (IB.NOMBRE).
+     */
+    public function cuentaCorresponsal(string $corresponsal): ?string
+    {
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return null;
+        }
+
+        $sql = <<<SQL
+            SELECT CB.CODIGO
+            FROM CB
+                INNER JOIN IB ON CB.CDGIB = IB.CODIGO AND CB.CDGEM = IB.CDGEM
+            WHERE CB.CDGEM = 'EMPFIN'
+                AND CB.TIPO = 'D'
+                AND CB.CODIGO IN ('20', '31', '64')
+                AND UPPER(TRIM(IB.NOMBRE)) = :corresponsal
+        SQL;
+
+        try {
+            $filas = $db->queryAll($sql, ['corresponsal' => strtoupper(trim($corresponsal))]);
+            if (!is_array($filas) || count($filas) !== 1) {
+                return null;
+            }
+            $codigo = trim((string) ($filas[0]['CODIGO'] ?? ''));
+            return $codigo !== '' ? $codigo : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Crédito registrado en PDI para una referencia BanCoppel "########### Transf. a FINANCIERA CULTIVA".
+     * Solo se acepta si la referencia corresponde a un único crédito.
+     */
+    public function creditoDesdePdi(string $referencia): ?string
+    {
+        $referencia = trim($referencia);
+        if ($referencia === '') {
+            return null;
+        }
+
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return null;
+        }
+
+        $sql = <<<SQL
+            SELECT CDGCLNS
+            FROM PDI
+            WHERE REFERENCIA = :referencia
+                AND CDGCLNS IS NOT NULL
+            GROUP BY CDGCLNS
+        SQL;
+
+        try {
+            $filas = $db->queryAll($sql, ['referencia' => $referencia]);
+            if (!is_array($filas) || count($filas) !== 1) {
+                return null;
+            }
+            $credito = trim((string) ($filas[0]['CDGCLNS'] ?? ''));
+            return $credito !== '' ? $credito : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     /** @deprecated Usar siguienteIdLoteImportacion() */
     public function siguienteIdImportacion(): int
     {
@@ -232,7 +300,7 @@ class ImportacionPagosRepository
             INSERT INTO PAGOSDIA (
                 CDGEM, CDGNS, CICLO, SECUENCIA, FECHA, MONTO, TIPO, ESTATUS,
                 FREGISTRO, CDGPE, NOMBRE, CDGOCPE, EJECUTIVO,
-                REFERENCIA, REFERENCIA_ORIGINAL, ARCHIVO, ID_LOTE_IMPORTACION, INCIDENCIA
+                REFERENCIA, REFERENCIA_ORIGINAL, ARCHIVO, ID_LOTE_IMPORTACION, INCIDENCIA, CDGCB
             ) VALUES (
                 'EMPFIN',
                 :cdgns,
@@ -251,7 +319,8 @@ class ImportacionPagosRepository
                 :referencia_original,
                 :archivo,
                 :id_lote,
-                :incidencia
+                :incidencia,
+                :cdgcb
             )
         SQL;
 
@@ -277,6 +346,7 @@ class ImportacionPagosRepository
             'archivo' => $pago['ARCHIVO'],
             'id_lote' => $pago['ID_LOTE_IMPORTACION'],
             'incidencia' => $pago['INCIDENCIA'] ?? 0,
+            'cdgcb' => $pago['CDGCB'],
         ]);
     }
 
@@ -312,7 +382,8 @@ class ImportacionPagosRepository
                 PD.MONTO,
                 PD.REFERENCIA,
                 PD.ARCHIVO,
-                PD.ID_LOTE_IMPORTACION
+                PD.ID_LOTE_IMPORTACION,
+                CASE WHEN PD.ID_IMPORTACION IS NOT NULL OR PD.F_IMPORTACION IS NOT NULL THEN 1 ELSE 0 END AS PROCESADO
             FROM PAGOSDIA PD
             WHERE {$cond}
             ORDER BY PD.FECHA DESC, PD.SECUENCIA DESC
@@ -391,28 +462,41 @@ class ImportacionPagosRepository
             return [];
         }
 
+        // Lotes cargados en los últimos 15 días (FREGISTRO = momento de carga).
+        $lotesRecientes = <<<SQL
+            SELECT ARCHIVO, ID_LOTE_IMPORTACION
+            FROM PAGOSDIA
+            WHERE ARCHIVO IS NOT NULL
+            GROUP BY ARCHIVO, ID_LOTE_IMPORTACION
+            HAVING MAX(FREGISTRO) >= TRUNC(SYSDATE) - 15
+        SQL;
+
         // FECHA_CARGA = momento de carga (FREGISTRO). No confundir con F_IMPORTACION del cierre.
         $sql = <<<SQL
             SELECT
-                ARCHIVO,
-                ID_LOTE_IMPORTACION,
-                MIN(TO_CHAR(FECHA, 'DD/MM/YYYY')) AS FECHA_PAGO,
-                COUNT(DISTINCT TRUNC(FECHA)) AS NUM_FECHAS,
+                PD.ARCHIVO,
+                PD.ID_LOTE_IMPORTACION,
+                MAX(PD.CDGCB) AS CDGCB,
+                MAX(IB.NOMBRE) AS CORRESPONSAL,
+                MIN(TO_CHAR(PD.FECHA, 'DD/MM/YYYY')) AS FECHA_PAGO,
+                COUNT(DISTINCT TRUNC(PD.FECHA)) AS NUM_FECHAS,
                 COUNT(*) AS REGISTROS,
-                SUM(MONTO) AS MONTO_TOTAL,
-                SUM(CASE WHEN INCIDENCIA = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS,
-                MIN(TO_CHAR(FREGISTRO, 'DD/MM/YYYY HH24:MI:SS')) AS FECHA_CARGA,
+                SUM(PD.MONTO) AS MONTO_TOTAL,
+                SUM(CASE WHEN PD.INCIDENCIA = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS,
+                MIN(TO_CHAR(PD.FREGISTRO, 'DD/MM/YYYY HH24:MI:SS')) AS FECHA_CARGA,
                 CASE
                     WHEN SUM(CASE
-                        WHEN ID_IMPORTACION IS NOT NULL OR F_IMPORTACION IS NOT NULL THEN 1
+                        WHEN PD.ID_IMPORTACION IS NOT NULL OR PD.F_IMPORTACION IS NOT NULL THEN 1
                         ELSE 0
                     END) = 0 THEN 1
                     ELSE 0
                 END AS PUEDE_ELIMINAR
-            FROM PAGOSDIA
-            WHERE ARCHIVO IS NOT NULL
-            GROUP BY ARCHIVO, ID_LOTE_IMPORTACION
-            ORDER BY MAX(FREGISTRO) DESC
+            FROM PAGOSDIA PD
+                LEFT JOIN CB ON CB.CDGEM = PD.CDGEM AND CB.CODIGO = PD.CDGCB
+                LEFT JOIN IB ON IB.CDGEM = CB.CDGEM AND IB.CODIGO = CB.CDGIB
+            WHERE (PD.ARCHIVO, PD.ID_LOTE_IMPORTACION) IN ({$lotesRecientes})
+            GROUP BY PD.ARCHIVO, PD.ID_LOTE_IMPORTACION
+            ORDER BY MAX(PD.FREGISTRO) DESC
         SQL;
 
         $sqlDesglose = <<<SQL
@@ -425,7 +509,7 @@ class ImportacionPagosRepository
                 SUM(PD.MONTO) AS MONTO,
                 SUM(CASE WHEN NVL(PD.INCIDENCIA, 0) = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS
             FROM PAGOSDIA PD
-            WHERE PD.ARCHIVO IS NOT NULL
+            WHERE (PD.ARCHIVO, PD.ID_LOTE_IMPORTACION) IN ({$lotesRecientes})
             GROUP BY ARCHIVO, ID_LOTE_IMPORTACION, TRUNC(PD.FECHA)
             ORDER BY TRUNC(PD.FECHA)
         SQL;
@@ -580,6 +664,40 @@ class ImportacionPagosRepository
         }
     }
 
+    /**
+     * @return array{INCIDENCIA: int, PROCESADO: int}|null
+     */
+    public function estadoPago(string $fecha, string $secuencia): ?array
+    {
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return null;
+        }
+
+        $sql = <<<SQL
+            SELECT
+                CASE WHEN INCIDENCIA = 1 OR CDGNS = '000000' THEN 1 ELSE 0 END AS INCIDENCIA,
+                CASE WHEN ID_IMPORTACION IS NOT NULL OR F_IMPORTACION IS NOT NULL THEN 1 ELSE 0 END AS PROCESADO
+            FROM PAGOSDIA
+            WHERE CDGEM = 'EMPFIN'
+              AND TRUNC(FECHA) = TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND SECUENCIA = :secuencia
+        SQL;
+
+        try {
+            $row = $db->queryOne($sql, ['fecha' => substr($fecha, 0, 10), 'secuencia' => $secuencia]);
+            if (!is_array($row) || empty($row)) {
+                return null;
+            }
+            return [
+                'INCIDENCIA' => (int) ($row['INCIDENCIA'] ?? 0),
+                'PROCESADO' => (int) ($row['PROCESADO'] ?? 0),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function corregirIncidencia(
         string $fecha,
         string $secuencia,
@@ -615,7 +733,9 @@ class ImportacionPagosRepository
                 FACTUALIZA = SYSDATE
             WHERE TRUNC(FECHA) = TO_DATE(:fecha, 'YYYY-MM-DD')
               AND SECUENCIA = :secuencia
-              AND INCIDENCIA = 1
+              AND (INCIDENCIA = 1 OR CDGNS = '000000')
+              AND ID_IMPORTACION IS NULL
+              AND F_IMPORTACION IS NULL
         SQL;
 
         return $db->insert($sql, [

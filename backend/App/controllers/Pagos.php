@@ -57,9 +57,16 @@ class Pagos extends Controller
                     } else {
                         estatus = "<span class='badge-ok'>OK</span>";
                     }
+                    const refActual = (f.REFERENCIA || f.REFERENCIA_ORIGINAL || "-").toString();
+                    const refArchivo = (f.REFERENCIA_ORIGINAL || "").toString().trim();
+                    const referenciaHtml = '<div class="ci-ref-cell"><div class="ci-ref-nueva">' + refActual + "</div>"
+                        + (refArchivo !== "" && refArchivo !== refActual.trim()
+                            ? '<div class="ci-ref-ant">Ref. en archivo: ' + refArchivo + "</div>"
+                            : "")
+                        + "</div>";
                     return [
                         f.FECHA_FMT || f.FECHA || "-",
-                        '<span class="celda-principal">' + (f.REFERENCIA || f.REFERENCIA_ORIGINAL || "-") + "</span>",
+                        referenciaHtml,
                         '<span class="celda-principal">' + (f.CDGNS || "-") + "</span>",
                         f.CICLO || "-",
                         formateaMoneda(f.MONTO),
@@ -164,7 +171,7 @@ class Pagos extends Controller
                 let html = '<div class="ci-ref-cell">';
                 html += '<div class="ci-ref-nueva">' + actual + "</div>";
                 if (huboCorreccion && original !== "" && original !== actual) {
-                    html += '<div class="ci-ref-ant">Original: ' + original + "</div>";
+                    html += '<div class="ci-ref-ant">Ref. en archivo: ' + original + "</div>";
                 }
                 if (quien !== "" || cuando !== "") {
                     html += '<div class="ci-ref-meta">Corregido'
@@ -207,8 +214,10 @@ class Pagos extends Controller
                         const incidenciasHtml = multi
                             ? renderCeldaMulti(desglose, "INCIDENCIAS", f.INCIDENCIAS || 0)
                             : (f.INCIDENCIAS || 0);
+                        const archivoHtml = '<span class="celda-principal">' + (archivo || "-") + "</span>"
+                            + (f.CORRESPONSAL ? '<span class="celda-secundaria">' + f.CORRESPONSAL + "</span>" : "");
                         return [
-                            archivo || "-",
+                            archivoHtml,
                             fechaHtml,
                             registrosHtml,
                             montoHtml,
@@ -283,7 +292,9 @@ class Pagos extends Controller
                 $.getJSON("/Pagos/ListarIncidencias/", (res) => {
                     if (!res.success) return;
                     const datos = (res.datos || []).map((f) => {
-                        const btn = "<button type='button' class='btn btn-warning btn-xs btn-corregir' " +
+                        const btn = parseInt(f.PROCESADO, 10) === 1
+                            ? "<span class='badge-duplicado'>Procesada en cierre</span>"
+                            : "<button type='button' class='btn btn-warning btn-xs btn-corregir' " +
                             "data-fecha='" + (f.FECHA || "") + "' data-secuencia='" + (f.SECUENCIA || "") + "' " +
                             "data-referencia='" + String(f.REFERENCIA || "").replace(/'/g, "&#39;") + "' " +
                             "data-monto='" + (f.MONTO || "") + "' " +
@@ -445,7 +456,7 @@ class Pagos extends Controller
                     let ext = "";
                     if (c === "OXXO") ext = ".dat";
                     else if (c === "PAYCASH") ext = ".csv";
-                    else if (c === "BANCOPPEL") ext = ".xls,.xlsx,.xsl,.csv";
+                    else if (c === "BANCOPPEL") ext = ".xls,.xlsx";
                     $("#archivo_layout").attr("accept", ext);
                     $("#hint-extension").text(ext ? "Extensiones: " + ext : "");
                 });

@@ -67,7 +67,7 @@
                 <div class="body tab-content">
                     <div role="tabpanel" class="tab-pane active" id="tab-historial">
                         <p class="ci-tab-intro">
-                            Archivos ya importados en el sistema. Si un archivo aparece aquí, no podrá cargarse de nuevo.
+                            Archivos importados en los últimos 15 días. Un archivo ya importado no podrá cargarse de nuevo.
                             Puede eliminarlo solo si ninguno de sus pagos ha sido procesado en el cierre.
                         </p>
                         <table class="table table-striped table-bordered table-hover" id="tabla-historial-importacion">
@@ -90,6 +90,7 @@
                         <p class="ci-tab-intro">
                             Pagos con crédito <strong>000000</strong> y ciclo <strong>00</strong> por referencia inválida o crédito no encontrado.
                             Capture el crédito y ciclo correctos de un préstamo en situación <strong>Entregado</strong>.
+                            Las incidencias ya procesadas en el cierre no se pueden corregir.
                         </p>
                         <table class="table table-striped table-bordered table-hover" id="tabla-incidencias-importacion">
                             <thead>

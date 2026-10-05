@@ -36,10 +36,10 @@ class ImportacionPagosParser
                 }
                 return self::parsearPaycash($rutaArchivo, $nombreArchivo);
             case self::CORRESPONSAL_BANCOPPEL:
-                if (!in_array($ext, ['xls', 'xlsx', 'csv'], true)) {
-                    return self::error('BanCoppel requiere archivo .xls, .xlsx o .csv');
+                if (!in_array($ext, ['xls', 'xlsx'], true)) {
+                    return self::error('BanCoppel requiere archivo Excel (.xls o .xlsx)');
                 }
-                return self::parsearBanCoppel($rutaArchivo, $nombreArchivo, $ext);
+                return self::parsearBanCoppel($rutaArchivo, $nombreArchivo);
             default:
                 return self::error('Corresponsal no reconocido.');
         }
@@ -155,14 +155,9 @@ class ImportacionPagosParser
     /**
      * @return array{success: bool, mensaje: string, datos?: array, error?: string}
      */
-    private static function parsearBanCoppel(string $ruta, string $archivo, string $ext): array
+    private static function parsearBanCoppel(string $ruta, string $archivo): array
     {
-        $filas = [];
-        if ($ext === 'csv') {
-            $filas = self::leerFilasCsv($ruta);
-        } else {
-            $filas = self::leerFilasExcel($ruta);
-        }
+        $filas = self::leerFilasExcel($ruta);
 
         if (empty($filas)) {
             return self::error('No se pudieron leer filas del archivo BanCoppel. Verifique que sea .xls/.xlsx legible (no protegido).');
@@ -462,23 +457,6 @@ class ImportacionPagosParser
     /**
      * @return list<array<int, string>>
      */
-    private static function leerFilasCsv(string $ruta): array
-    {
-        $fh = @fopen($ruta, 'rb');
-        if ($fh === false) {
-            return [];
-        }
-        $filas = [];
-        while (($fila = fgetcsv($fh)) !== false) {
-            $filas[] = $fila;
-        }
-        fclose($fh);
-        return $filas;
-    }
-
-    /**
-     * @return list<array<int, string>>
-     */
     private static function leerFilasExcel(string $ruta): array
     {
         // Muchos bancos exportan "Excel" que en realidad es HTML con extensión .xls
@@ -733,6 +711,12 @@ class ImportacionPagosParser
 
         $token = preg_split('/\s+/', strtoupper($referencia))[0] ?? '';
         return (self::referenciaPaycashValida($token) && $token[0] === '0') ? 'G' : 'P';
+    }
+
+    /** Referencia BanCoppel de transferencia: "########### Transf. a FINANCIERA CULTIVA". */
+    public static function esReferenciaTransferencia(string $referencia): bool
+    {
+        return preg_match('/^\d+\s+TRANSF\.\s+A\s+FINANCIERA\s+CULTIVA$/i', trim($referencia)) === 1;
     }
 
     public static function referenciaPaycashValida(string $referencia): bool
