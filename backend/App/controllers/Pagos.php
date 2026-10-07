@@ -4,6 +4,7 @@ namespace App\controllers;
 
 defined("APPPATH") or die("Access denied");
 
+use App\services\CierreDiaService;
 use App\services\ImportacionPagosService;
 use Core\Controller;
 use Core\View;
@@ -21,10 +22,13 @@ class Pagos extends Controller
     }
 
     /**
-     * Vista principal: importación de layouts de corresponsales.
+     * Vista principal: importación de layouts de corresponsales y proceso de cierre de día.
      */
-    public function ImportarPagos()
+    public function CierreDia()
     {
+        $estadoCierre = json_encode(CierreDiaService::estado()['datos']);
+        $msgEnEjecucion = json_encode(CierreDiaService::MSG_EN_EJECUCION);
+
         $extraFooter = <<<HTML
         <script>
             {$this->mensajes}
@@ -38,6 +42,18 @@ class Pagos extends Controller
             const idTablaDetalle = "tabla-detalle-importacion";
 
             let previewActual = null;
+            let estadoCierre = {$estadoCierre};
+            let cierreEnProceso = !!estadoCierre.ejecutando;
+            let fechaCierreProceso = estadoCierre.fecha || null;
+            let timerCierre = null;
+            let timerTranscurrido = null;
+            const msgCierreEnProceso = {$msgEnEjecucion};
+
+            const bloqueadoPorCierre = () => {
+                if (!cierreEnProceso) return false;
+                showWarning(msgCierreEnProceso);
+                return true;
+            };
 
             const formateaMoneda = (v) => {
                 const n = parseFloat(v);
@@ -231,6 +247,7 @@ class Pagos extends Controller
             };
 
             const verDetalleImportacion = (archivo, idLote) => {
+                if (bloqueadoPorCierre()) return;
                 if (!archivo) return showWarning("No se pudo identificar el archivo.");
                 swal({ text: "Cargando registros...", icon: "/img/wait.gif", button: false, closeOnClickOutside: false, closeOnEsc: false });
                 $.getJSON("/Pagos/DetalleImportacion/", { archivo: archivo, id_lote_importacion: idLote || "" }, (res) => {
@@ -269,6 +286,7 @@ class Pagos extends Controller
             };
 
             const eliminarImportacion = async (archivo, idLote) => {
+                if (bloqueadoPorCierre()) return;
                 if (!archivo) return showWarning("No se pudo identificar el archivo.");
                 const ok = await confirmarMovimiento(
                     "Eliminar importación",
@@ -316,6 +334,7 @@ class Pagos extends Controller
             };
 
             const previsualizar = () => {
+                if (bloqueadoPorCierre()) return;
                 const archivo = $("#archivo_layout")[0].files[0];
                 const corresponsal = $("#corresponsal").val();
                 if (!archivo) return showWarning("Seleccione un archivo.");
@@ -365,6 +384,7 @@ class Pagos extends Controller
             };
 
             const confirmar = async () => {
+                if (bloqueadoPorCierre()) return;
                 if (!previewActual) return showWarning("Primero previsualice el archivo.");
                 if ((previewActual.duplicados || 0) > 0) {
                     return showError("No se puede importar: hay pagos que ya existen en el sistema.");
@@ -402,6 +422,178 @@ class Pagos extends Controller
                         });
                     },
                     error: () => { swal.close(); showError("Error al importar pagos."); }
+                });
+            };
+
+            const formateaFechaIso = (iso) => {
+                const p = String(iso || "").split("-");
+                return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : (iso || "");
+            };
+
+            const aplicarBloqueoCierre = () => {
+                const b = cierreEnProceso;
+                $("body").toggleClass("ci-cierre-en-proceso", b);
+                $("#corresponsal, #archivo_layout, #btn_previsualizar, #fecha_cierre, #btn_procesar_cierre, #btn_guardar_correccion, #corr_credito, #corr_ciclo")
+                    .prop("disabled", b);
+                if (b) {
+                    $("#modalPreviewImportacion, #modalCorregirIncidencia, #modalDetalleImportacion").modal("hide");
+                    previewActual = null;
+                    $("#btn_confirmar").prop("disabled", true);
+                    muestraAvisoEjecucion();
+                    $("#btn_procesar_cierre").html("<i class='fa fa-spinner fa-spin'></i> Procesando...");
+                } else {
+                    clearTimeout(timerTranscurrido);
+                    $("#alertaEjecucion").hide();
+                    $("#tiempoEstimado").html("");
+                    $("#btn_procesar_cierre").html("<i class='fa fa-cogs'></i> Procesar cierre");
+                }
+            };
+
+            const escHtml = (s) => {
+                const d = document.createElement("div");
+                d.textContent = s == null ? "" : String(s);
+                return d.innerHTML;
+            };
+
+            const htmlTiempoEstimadoCierre = () => {
+                const estimado = parseInt(estadoCierre.tiempo_estimado, 10) || 0;
+                if (!(estimado > 0)) return "";
+                const limite = estimado * 2;
+                return "<p>Tiempo estimado de finalización: <b>" + estimado + "</b> minutos.</p>"
+                    + "<p>Si demora más de <b>" + limite + "</b> minutos, comuníquese con desarrollo.</p>";
+            };
+
+            const getTiempoTranscurrido = (diferencia) => {
+                const horas = Math.floor(diferencia / 3600);
+                const minutos = Math.floor((diferencia % 3600) / 60);
+                const segundos = diferencia % 60;
+                return String(horas).padStart(2, "0") + ":" + String(minutos).padStart(2, "0") + ":" + String(segundos).padStart(2, "0");
+            };
+
+            const actualizaTiempoTranscurrido = (diferencia) => {
+                clearTimeout(timerTranscurrido);
+                timerTranscurrido = setTimeout(() => {
+                    diferencia++;
+                    $("#transcurrido").html(getTiempoTranscurrido(diferencia));
+                    actualizaTiempoTranscurrido(diferencia);
+                }, 1000);
+            };
+
+            const muestraAvisoEjecucion = () => {
+                if (!estadoCierre.inicio) {
+                    clearTimeout(timerTranscurrido);
+                    $("#tiempoEstimado").html("<p>El cierre se está iniciando. El aviso se mostrará cuando el procedimiento registre actividad en bitácora.</p>");
+                    $("#alertaEjecucion").show();
+                    return;
+                }
+                const diferencia = Math.max(0, parseInt(estadoCierre.segundos, 10) || 0);
+                let mensaje = "<p>El proceso de cierre diario se encuentra en ejecución desde el " + escHtml(estadoCierre.inicio)
+                    + " por el usuario <b>" + escHtml(estadoCierre.usuario || "-") + "</b>.</p>";
+                mensaje += htmlTiempoEstimadoCierre();
+                mensaje += "<p>Tiempo transcurrido: <b id='transcurrido'>" + getTiempoTranscurrido(diferencia) + "</b></p>";
+                $("#tiempoEstimado").html(mensaje);
+                $("#alertaEjecucion").show();
+                actualizaTiempoTranscurrido(diferencia);
+            };
+
+            const finalizarCierre = () => {
+                const fecha = fechaCierreProceso;
+                cierreEnProceso = false;
+                fechaCierreProceso = null;
+                aplicarBloqueoCierre();
+                if (estadoCierre.fecha_sugerida) $("#fecha_cierre").val(estadoCierre.fecha_sugerida);
+                cargarHistorial();
+                cargarIncidencias();
+                if (!fecha) return;
+
+                $.getJSON("/Pagos/ResultadoCierre/", { fecha: fecha }, (res) => {
+                    if (!res || !res.success) return showError((res && res.mensaje) || "No se pudo consultar el resultado del cierre.");
+                    const d = res.datos || {};
+                    if (d.exito) {
+                        showSuccess("El cierre del día " + formateaFechaIso(fecha) + " concluyó correctamente. El resumen se envía por correo.");
+                    } else {
+                        showError("El cierre del día " + formateaFechaIso(fecha) + " no se completó: " + (d.mensaje || "error desconocido"));
+                    }
+                }).fail(() => showError("No se pudo consultar el resultado del cierre."));
+            };
+
+            const programarConsultaCierre = () => {
+                clearTimeout(timerCierre);
+                timerCierre = setTimeout(consultarEstadoCierre, cierreEnProceso ? 4000 : 20000);
+            };
+
+            const consultarEstadoCierre = () => {
+                $.getJSON("/Pagos/EstadoCierre/", (res) => {
+                    if (!res || !res.success) return;
+                    const estabaEnProceso = cierreEnProceso;
+                    estadoCierre = res.datos || {};
+                    if (estadoCierre.ejecutando) {
+                        cierreEnProceso = true;
+                        fechaCierreProceso = estadoCierre.fecha || fechaCierreProceso;
+                        aplicarBloqueoCierre();
+                    } else if (estabaEnProceso) {
+                        finalizarCierre();
+                    }
+                }).always(programarConsultaCierre);
+            };
+
+            const procesarCierre = () => {
+                if (bloqueadoPorCierre()) return;
+                const fecha = $("#fecha_cierre").val();
+                if (!fecha) return showWarning("Seleccione la fecha del cierre.");
+
+                consultaServidor("/Pagos/ValidacionPreviaCierre/", { fecha: fecha }, async (res) => {
+                    if (!res.success) return showError(res.mensaje || "No es posible procesar el cierre.");
+                    const d = res.datos || {};
+                    if (d.yaEjecutado && !d.puedeRegenerar) {
+                        return showError("El cierre de ese día ya fue ejecutado. Solo un administrador puede regenerarlo.");
+                    }
+
+                    const pagos = parseInt(d.REGISTROS, 10) || 0;
+                    const avisoPagos = pagos === 0
+                        ? "No hay pagos registrados para el día " + d.fecha_fmt + ". "
+                        : "Hay " + pagos + " pago" + (pagos === 1 ? "" : "s") + " registrado" + (pagos === 1 ? "" : "s") + " por " + formateaMoneda(d.MONTO) + ". ";
+
+                    if (d.yaEjecutado) {
+                        const okRegenerar = await confirmarMovimiento(
+                            "Regenerar cierre",
+                            avisoPagos + "El cierre del día " + d.fecha_fmt + " ya fue procesado. ¿Desea regenerar? Se eliminarán los registros y se crearán nuevos. Esta acción no se puede deshacer."
+                        );
+                        if (!okRegenerar) return;
+                        const pass = await swal({
+                            text: "Ingrese su contraseña para confirmar la regeneración del cierre:",
+                            content: { element: "input", attributes: { type: "password", placeholder: "Contraseña" } },
+                            buttons: ["Cancelar", "Confirmar"]
+                        });
+                        if (!pass) return;
+                        consultaServidor("/Pagos/ValidarPasswordCierreDiario/", { password: pass }, (rp) => {
+                            if (!rp.success) return showError(rp.mensaje || "Contraseña incorrecta.");
+                            iniciarCierre(fecha, true);
+                        });
+                        return;
+                    }
+
+                    const ok = await confirmarMovimiento(
+                        pagos === 0 ? "Fecha sin pagos registrados" : "Procesar cierre de día",
+                        avisoPagos + (pagos === 0 ? "¿Desea procesar el cierre de todos modos?" : "¿Desea procesar el cierre del día " + d.fecha_fmt + "?")
+                        + " Mientras el cierre se procesa no se podrá realizar ninguna acción en esta pantalla."
+                    );
+                    if (!ok) return;
+                    iniciarCierre(fecha, false);
+                });
+            };
+
+            const iniciarCierre = (fecha, regenerar) => {
+                const payload = { fecha: fecha };
+                if (regenerar) payload.regenerar = "1";
+                consultaServidor("/Pagos/ProcesaCierreDia/", payload, (r) => {
+                    if (!r.success) return showError(r.mensaje || "No se pudo iniciar el cierre.");
+                    cierreEnProceso = true;
+                    fechaCierreProceso = fecha;
+                    estadoCierre = Object.assign({}, estadoCierre, { ejecutando: true, fecha: fecha, usuario: (r.datos || {}).usuario || null, inicio: null });
+                    aplicarBloqueoCierre();
+                    programarConsultaCierre();
+                    showSuccess(r.mensaje);
                 });
             };
 
@@ -462,6 +654,7 @@ class Pagos extends Controller
                 });
 
                 $(document).on("click", ".btn-corregir", function () {
+                    if (bloqueadoPorCierre()) return;
                     const fecha = $(this).data("fecha");
                     const secuencia = $(this).data("secuencia");
                     const referencia = $(this).data("referencia");
@@ -481,6 +674,7 @@ class Pagos extends Controller
                 });
 
                 $("#btn_guardar_correccion").click(async () => {
+                    if (bloqueadoPorCierre()) return;
                     const credito = ($("#corr_credito").val() || "").trim();
                     const ciclo = ($("#corr_ciclo").val() || "").trim();
                     if (!credito || !ciclo) {
@@ -508,13 +702,21 @@ class Pagos extends Controller
                     });
                 });
 
+                const hoy = new Date();
+                $("#fecha_cierre")
+                    .attr("max", hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0") + "-" + String(hoy.getDate()).padStart(2, "0"))
+                    .val(estadoCierre.fecha_sugerida || "");
+                $("#btn_procesar_cierre").click(procesarCierre);
+                aplicarBloqueoCierre();
+                programarConsultaCierre();
+
                 cargarHistorial();
                 cargarIncidencias();
             });
         </script>
         HTML;
 
-        $extraHeader = $this->GetExtraHeader('Importar Pagos')
+        $extraHeader = $this->GetExtraHeader('Cierre de día')
             . '<link href="/css/pagos-importar.css" rel="stylesheet">';
         View::set('header', $this->_contenedor->header($extraHeader));
         View::set('footer', $this->_contenedor->footer($extraFooter));
@@ -530,6 +732,10 @@ class Pagos extends Controller
 
     public function ConfirmarImportacion()
     {
+        if ($bloqueo = CierreDiaService::respuestaSiEnEjecucion()) {
+            echo json_encode($bloqueo);
+            return;
+        }
         $this->procesarArchivo(function ($ruta, $nombre, $corresponsal) {
             return ImportacionPagosService::confirmarImportacion($ruta, $nombre, $corresponsal, $this->__usuario);
         });
@@ -558,6 +764,10 @@ class Pagos extends Controller
 
     public function EliminarImportacion()
     {
+        if ($bloqueo = CierreDiaService::respuestaSiEnEjecucion()) {
+            echo json_encode($bloqueo);
+            return;
+        }
         echo json_encode(ImportacionPagosService::eliminarImportacion([
             'archivo' => $_POST['archivo'] ?? ($_GET['archivo'] ?? ''),
             'id_lote_importacion' => $_POST['id_lote_importacion'] ?? ($_GET['id_lote_importacion'] ?? null),
@@ -566,9 +776,47 @@ class Pagos extends Controller
 
     public function CorregirIncidencia()
     {
+        if ($bloqueo = CierreDiaService::respuestaSiEnEjecucion()) {
+            echo json_encode($bloqueo);
+            return;
+        }
         $datos = $_POST;
         $datos['usuario'] = $this->__usuario;
         echo json_encode(ImportacionPagosService::corregirIncidencia($datos));
+    }
+
+    public function EstadoCierre()
+    {
+        echo json_encode(CierreDiaService::estado());
+    }
+
+    public function ValidacionPreviaCierre()
+    {
+        echo json_encode(CierreDiaService::validacionPrevia((string) ($_POST['fecha'] ?? ''), (string) $this->__perfil));
+    }
+
+    /**
+     * Doble verificación para regenerar un cierre ya ejecutado.
+     */
+    public function ValidarPasswordCierreDiario()
+    {
+        $ok = \App\models\Login::ValidaPassword($this->__usuario, (string) ($_POST['password'] ?? ''));
+        echo json_encode(['success' => $ok, 'mensaje' => $ok ? 'Contraseña correcta.' : 'Contraseña incorrecta.']);
+    }
+
+    public function ProcesaCierreDia()
+    {
+        echo json_encode(CierreDiaService::procesar(
+            (string) ($_POST['fecha'] ?? ''),
+            (string) $this->__usuario,
+            (string) $this->__perfil,
+            !empty($_POST['regenerar'])
+        ));
+    }
+
+    public function ResultadoCierre()
+    {
+        echo json_encode(CierreDiaService::resultado((string) ($_GET['fecha'] ?? '')));
     }
 
     /**

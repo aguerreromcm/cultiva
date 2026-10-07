@@ -1093,3 +1093,43 @@
         max-width: none;
     }
 }
+
+/* Cierre de día: barra de importación a la izquierda y cierre a la derecha */
+.pagos-import-page .ci-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0 16px;
+}
+
+.pagos-import-page .ci-toolbar-row .ci-toolbar-cierre {
+    margin-left: auto;
+}
+
+.pagos-import-page .ci-field-fecha-cierre {
+    flex: 0 0 170px;
+    width: 170px;
+}
+
+.pagos-import-page .ci-field-fecha-cierre .form-control {
+    width: 100%;
+    font-weight: 600;
+    padding: 0 10px;
+}
+
+body.ci-cierre-en-proceso .pagos-import-page table .btn,
+body.ci-cierre-en-proceso .modal .modal-footer .btn:not([data-dismiss]) {
+    pointer-events: none;
+    opacity: 0.45;
+}
+
+@media (max-width: 768px) {
+    .pagos-import-page .ci-toolbar-row {
+        display: block;
+    }
+
+    .pagos-import-page .ci-field-fecha-cierre {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+}

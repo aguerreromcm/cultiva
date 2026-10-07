@@ -4,14 +4,16 @@
     <div class="panel panel-default pagos-import-page">
         <div class="panel-body">
             <div class="x_title">
-                <h3>Importar pagos de corresponsales</h3>
+                <h3>Cierre de día</h3>
                 <div class="clearfix"></div>
             </div>
 
             <p class="text-muted ci-descripcion">
-                Cargue los layouts recibidos de <strong>OXXO</strong>, <strong>PAYCASH</strong> o <strong>BanCoppel</strong> para importar los pagos.
+                Cargue los layouts recibidos de <strong>OXXO</strong>, <strong>PAYCASH</strong> o <strong>BanCoppel</strong> para importar los pagos
+                y procese el cierre del día. Al finalizar se envía el resultado por correo.
             </p>
 
+            <div class="ci-toolbar-row">
             <div class="panel-card ft-toolbar ci-toolbar">
                 <div class="ft-toolbar-inner">
                     <div class="ci-field ci-field-corresponsal">
@@ -49,12 +51,38 @@
                 </div>
             </div>
 
+            <div class="panel-card ft-toolbar ci-toolbar ci-toolbar-cierre">
+                <div class="ft-toolbar-inner">
+                    <div class="ci-field ci-field-fecha-cierre">
+                        <label class="ft-tb-lbl" for="fecha_cierre">
+                            <i class="fa fa-calendar"></i> Fecha de cierre
+                        </label>
+                        <input type="date" id="fecha_cierre" class="form-control ci-control">
+                    </div>
+
+                    <div class="ci-field ci-field-acciones">
+                        <span class="ft-tb-lbl ci-lbl-spacer" aria-hidden="true">&nbsp;</span>
+                        <div class="ci-acciones-line">
+                            <button type="button" id="btn_procesar_cierre" class="btn btn-success">
+                                <i class="fa fa-cogs"></i> Procesar cierre
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="alert alert-warning" role="alert" style="display: none;" id="alertaEjecucion">
+                <strong>El cierre se está ejecutando.</strong><br>
+                <span id="tiempoEstimado"></span>
+            </div>
+
             <div class="panel-card ci-tabs-wrap">
                 <div class="head" style="padding-bottom: 0;">
                     <ul class="nav nav-tabs ci-tabs" role="tablist">
                         <li role="presentation" class="active">
                             <a href="#tab-historial" aria-controls="tab-historial" role="tab" data-toggle="tab">
-                                <i class="fa fa-history"></i> Historial
+                                <i class="fa fa-money"></i> Pagos
                             </a>
                         </li>
                         <li role="presentation">

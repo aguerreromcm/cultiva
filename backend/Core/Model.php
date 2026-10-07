@@ -43,4 +43,26 @@ class Model
             return self::Responde(false, 'Error al obtener sucursales', null, $e->getMessage());
         }
     }
+
+    public static function GetDestinatarios_Aplicacion($aplicacion)
+    {
+        $qry = <<<SQL
+            SELECT DISTINCT
+                CD.CORREO
+            FROM
+                CORREO_APLICACION_GRUPO CAG
+                JOIN CORREO_DIRECTORIO_GRUPO CDG ON CAG.ID_GRUPO = CDG.ID_GRUPO
+                JOIN CORREO_DIRECTORIO CD ON CD.ID = CDG.ID_CORREO
+            WHERE
+                CAG.ID_APLICACION = :aplicacion
+        SQL;
+
+        try {
+            $db = new Database();
+            $res = $db->queryAll($qry, ['aplicacion' => $aplicacion]);
+            return self::Responde(true, 'Destinatarios obtenidos', $res);
+        } catch (\Exception $e) {
+            return self::Responde(false, 'Error al obtener destinatarios', null, $e->getMessage());
+        }
+    }
 }

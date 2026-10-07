@@ -67,4 +67,27 @@ class Login
         $db = new Database;
         return $db->queryAll($query);
     }
+
+    public static function ValidaPassword($usuario, $password)
+    {
+        if (trim((string) $usuario) === '' || trim((string) $password) === '') {
+            return false;
+        }
+        $query = <<<SQL
+            SELECT COUNT(*) AS OK
+            FROM PE
+            WHERE PE.CDGEM = 'EMPFIN'
+            AND PE.ACTIVO = 'S'
+            AND (PE.BLOQUEO = 'N' OR PE.BLOQUEO IS NULL)
+            AND PE.CODIGO = :usuario
+            AND PE.CLAVE = CODIFICA(:password)
+        SQL;
+        try {
+            $db = new Database();
+            $r = $db->queryOne($query, [':usuario' => $usuario, ':password' => $password]);
+            return $r && isset($r['OK']) && (int) $r['OK'] > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
 }

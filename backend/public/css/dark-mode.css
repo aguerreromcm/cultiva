@@ -73,10 +73,22 @@
         color: #c9d1d9;
     }
 
-    .panel-heading {
+    .panel-heading,
+    .panel-default > .panel-heading {
         background-color: #252930;
         border-color: #3d444d;
         color: #e6edf3;
+    }
+
+    .dropdown-menu,
+    .dropdown-menu .dropdown-item,
+    .dropdown-menu .dropdown-header {
+        color: #c9d1d9;
+    }
+
+    .dropdown-menu .dropdown-item:hover {
+        background-color: #30363d;
+        color: #f0f6fc;
     }
 
     .text-muted {
@@ -231,6 +243,20 @@
         background-color: #3d444d;
         border-color: #484f58;
         color: #f0f6fc;
+    }
+
+    .btn-default:active,
+    .btn-default.active,
+    .btn-default:active:hover,
+    .btn-default:active:focus,
+    .open > .dropdown-toggle.btn-default,
+    .open > .dropdown-toggle.btn-default:hover,
+    .open > .dropdown-toggle.btn-default:focus {
+        background-color: #3d444d;
+        background-image: none;
+        border-color: #484f58;
+        color: #f0f6fc;
+        box-shadow: none;
     }
 
     /* DataTables (controles, “Procesando…” y paginación) */

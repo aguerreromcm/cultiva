@@ -106,9 +106,7 @@ class Menu
     private function opcionesCreditos()
     {
         $permisos = ['AMGM', 'PHEE', 'GASC', 'LSOC', 'MAJL', 'AFJJ'];
-        $permisosImportar = ['ADMIN', 'OFCLD', 'PLMV', 'LGFR', 'AMGM', 'GASC'];
         return [
-            $this->enlace('Importar Pagos', '/Pagos/ImportarPagos/', $permisosImportar),
             $this->enlace('Reporte de Referencias', '/Creditos/ReporteReferencias/', $permisos),
             $this->enlace('Reporte de Prestamos', '/Creditos/ReportePrestamos/', $permisos),
         ];
@@ -140,6 +138,7 @@ class Menu
     {
         return [
             $this->enlace('Cambio de Sucursal', '/Creditos/CambioSucursal/', ['ADMIN', 'CAMAG', 'ORHM', 'MAPH']),
+            $this->enlace('Cierre de día', '/Pagos/CierreDia/', ['ADMIN', 'OFCLD', 'PLMV', 'LGFR', 'AMGM', 'GASC']),
         ];
     }
 
@@ -149,6 +148,14 @@ class Menu
         return [
             $this->enlace('Consulta por grupo', '/contabilidad/ConsultaGrupo', ['AMGM', 'AMOCA']),
             $this->enlace('Reporte GL', '/contabilidad/ReporteGL', ['AMGM', 'AMOCA', 'LSOC', 'BGJF', 'FECR']),
+        ];
+    }
+
+    /** Opciones del submenú Administración */
+    private function opcionesAdministracion()
+    {
+        return [
+            $this->enlace('Administración de Correos', '/Creditos/AdminCorreos', ['ADMIN', 'AMGM', 'MAPH', 'HSEJ', 'PHEE', 'GOBA', 'FECR']),
         ];
     }
 
@@ -174,6 +181,7 @@ class Menu
             $this->submenu('Circulo de Crédito', 'glyphicon glyphicon-ok-circle', $this->opcionesCirculoCredito()),
             $this->submenu('Operaciones', 'glyphicon glyphicon-cog', $this->opcionesOperaciones()),
             $this->submenu('Contabilidad', 'glyphicon glyphicon-briefcase', $this->opcionesContabilidad()),
+            $this->submenu('Administración', 'glyphicon glyphicon-user', $this->opcionesAdministracion()),
         ];
 
         if ($this->mostrarHerramientas) {

@@ -426,4 +426,392 @@ class Creditos extends Controller
 
         \PHPSpreadsheet::DescargaExcel('Prestamos Cultiva', 'Reporte de Prestamos', 'Prestamos Cultiva', $columnas, $filas);
     }
+
+    public function AdminCorreos()
+    {
+        $extraFooter = <<<HTML
+            <script>
+                {$this->mensajes}
+                {$this->consultaServidor}
+                {$this->configuraTabla}
+                {$this->actualizaDatosTabla}
+
+                $(document).on("ready", () => {
+                    $("#addCorreo").on("click", () => $("#modalCorreo").modal("show"))
+                    $("#addGrupo").on("click", () => $("#modalGrupo").modal("show"))
+
+                    $("#areaFiltro").on("change", getCorreos)
+                    $("#sucursalFiltro").on("change", getCorreos)
+                    $("#btnAgregar").on("click", addCorreoGrupo)
+                    $("#btnQuitar").on("click", eliminarCorreoGrupo)
+                    $("#nombre").on("change", validaCampos)
+                    $("#correo").on("keyup", sugerenciasCorreo)
+                    $("#correo").on("blur", () => {
+                        const correo = $("#correo").val()
+                        $("#sugerenciasCorreo").remove()
+                        $("#correo").attr("list", "")
+                        if (!correo) return showError("Debe ingresar un correo electrónico.")
+                        if (!validaCorreo(correo)) return showError("El correo electrónico ingresado no es válido.")
+                    })
+                    $("#area").on("change", validaCampos)
+                    $("#sucursal").on("change", validaCampos)
+                    $("#guardarDireccion").on("click", addCorreo)
+                    $("#guardarGrupo").on("click", addGrupo)
+                    $("#buscarGrupo").on("keyup", buscarGrupos)
+
+                    configuraTabla("tblCorreos", {noRegXvista: false})
+                    configuraTabla("tblGrupo", {noRegXvista: false})
+                    getCorreos()
+                    getCorreoGrupo()
+
+                    $(".dataTables_filter").css("width", "100%")
+                })
+
+                const getCorreos = () => {
+                    const parametros = {}
+
+                    if ($("#areaFiltro").val() !== "*") parametros.area = $("#areaFiltro").val()
+                    if ($("#sucursalFiltro").val() !== "*") parametros.sucursal = $("#sucursalFiltro").val()
+
+                    consultaServidor("/Creditos/GetCorreos", parametros, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al buscar los correos.")
+                        if (respuesta.datos.length === 0) return showError("No se encontraron correos registrados.").then(() => actualizaDatosTabla("tblCorreos", []))
+
+                        const correos = respuesta.datos.map((correo) => {
+                            const checador = "<input type='checkbox' name='correo' value='" + correo.ID + "' onchange='compruebaCorreoGrupo(event)'>"
+
+                            return [
+                                checador,
+                                correo.NOMBRE,
+                                correo.CORREO,
+                                correo.AREA,
+                                correo.SUCURSAL
+                            ]
+                        })
+
+                        actualizaDatosTabla("tblCorreos", correos)
+                    })
+                }
+
+                let idsGrupo = new Set()
+
+                const getCorreoGrupo = () => {
+                    const grupo = $("#idGrupoSeleccionado").val()
+
+                    consultaServidor("/Creditos/GetCorreosGrupo", { grupo }, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al buscar los grupos.")
+
+                        idsGrupo = new Set(respuesta.datos.map((grupo) => String(grupo.ID_CORREO)))
+                        const grupos = respuesta.datos.map((grupo) => {
+                            return [
+                                grupo.EDITABLE == 1 ? "<input type='checkbox' name='grupo' value='" + grupo.ID_CORREO + "'>" : "",
+                                grupo.CORREO
+                            ]
+                        })
+
+                        actualizaDatosTabla("tblGrupo", grupos)
+                    })
+                }
+
+                const correoEnGrupo = (id) => idsGrupo.has(String(id))
+
+                const addCorreoGrupo = () => {
+                    const correosNuevos = []
+                    $("#tblCorreos").DataTable().$("input[type='checkbox']:checked").each((index, element) => {
+                        if (!correoEnGrupo($(element).val())) correosNuevos.push($(element).val())
+                        else element.checked = false
+                    })
+
+                    if (correosNuevos.length === 0) return showError("Seleccione al menos un correo que no esté en el grupo para agregarlo.")
+
+                    const grupo = $("#idGrupoSeleccionado").val()
+                    if (!grupo) return showError("Selecciones un grupo para agregar los correos.")
+
+                    consultaServidor("/Creditos/AgregaCorreoGrupo", { grupo, correos: correosNuevos }, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al agregar los correos al grupo.")
+
+                        $("#tblCorreos").DataTable().$("input[type='checkbox']").prop("checked", false)
+                        actualizaListaGrupos($("#grupoSeleccionado").text())
+                        showSuccess("Correos agregados al grupo correctamente.")
+                    })
+                }
+
+                const eliminarCorreoGrupo = () => {
+                    const correos = []
+                    $("#tblGrupo").DataTable().$("input[type='checkbox']:checked").each((index, element) => {
+                        correos.push($(element).val())
+                    })
+
+                    if (correos.length === 0) return showError("Seleccione al menos un correo para quitar del grupo.")
+
+                    const grupo = $("#idGrupoSeleccionado").val()
+                    if (!grupo) return showError("Selecciones un grupo para quitar los correos.")
+
+                    consultaServidor("/Creditos/EliminaCorreoGrupo", { grupo, correos }, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al quitar los correos del grupo.")
+
+                        actualizaListaGrupos($("#grupoSeleccionado").text())
+                        showSuccess("Correos quitados del grupo correctamente.")
+                    })
+                }
+
+                const compruebaCorreoGrupo = (e) => {
+                    if (!e.target.checked) return
+                    e.target.checked = false
+
+                    if ($("#idGrupoSeleccionado").val() === "") return showError("Debe seleccionar un grupo para agregar correos.")
+                    if (correoEnGrupo(e.target.value))
+                        return showError("El correo seleccionado ya está agregado al grupo " + $("#grupoSeleccionado").text() + ".")
+
+                    e.target.checked = true
+                }
+
+                const validaCampos = (e) => {
+                    $("#guardarDireccion").prop("disabled", (!$("#nombre").val() || !$("#correo").val() || !$("#area").val() || !$("#sucursal").val()))
+                }
+
+                const addCorreo = () => {
+                    if (!$("#nombre").val()) return showError("Ingrese el nombre del usuario.")
+                    if (!$("#correo").val()) return showError("Ingrese el correo electrónico.")
+                    if (!validaCorreo($("#correo").val())) return showError("El correo electrónico ingresado no es válido.")
+                    if (!$("#area").val()) return showError("Seleccione un área.")
+                    if (!$("#sucursal").val()) return showError("Seleccione una sucursal.")
+
+                    const registro = {
+                        nombre: $("#nombre").val(),
+                        correo: $("#correo").val(),
+                        area: $("#area").val(),
+                        sucursal: $("#sucursal").val()
+                    }
+
+                    consultaServidor("/Creditos/AgregaCorreo", registro, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al registrar el correo.")
+
+                        showSuccess("Correo registrado correctamente.")
+                        getCorreos()
+                    })
+
+                    $("#nombre").val("")
+                    $("#correo").val("")
+                    $("#area").val("")
+                    $("#sucursal").val("")
+                    $("#guardarDireccion").prop("disabled", true)
+
+                    $("#modalCorreo").modal("hide")
+                }
+
+                const validaCorreo = (correo) => {
+                    const regexCorreo = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
+                    return (!correo || !regexCorreo.test(correo)) ? false : true
+                }
+
+                const addGrupo = () => {
+                    const grupo = $("#nombreGrupo").val().trim()
+                    if (!grupo) return showError("Ingrese un nombre para el nuevo grupo.")
+
+                    const coincidencias = $("#grupoFiltro li .nombreGrupo").filter((index, element) => element.innerText.trim().toLowerCase() === grupo.toLowerCase())
+                    if (coincidencias.length > 0) return showError("El grupo " + grupo + " ya existe.")
+
+                    consultaServidor("/Creditos/AgregaGrupo", { grupo }, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al registrar el grupo.")
+
+                        showSuccess("Grupo registrado correctamente.")
+                        actualizaListaGrupos(grupo)
+                    })
+
+                    $("#nombreGrupo").val("")
+                    $("#modalGrupo").modal("hide")
+                }
+
+                const actualizaListaGrupos = (grupo = null) => {
+                    consultaServidor("/Creditos/GetParametros", null, (respuesta) => {
+                        if (!respuesta.success) return showError("Ocurrio un error al buscar los grupos.")
+
+                        $("#grupoFiltro").empty()
+                        $("#grupoFiltro").append(respuesta.datos.grupo)
+                        const encontrado = grupo ? $("#grupoFiltro li .nombreGrupo").filter((index, element) => element.innerText === grupo) : $()
+                        if (encontrado.length > 0) encontrado.click()
+                        else {
+                            $("#grupoSeleccionado").text("Seleccionar grupo")
+                            $("#idGrupoSeleccionado").val("")
+                            getCorreoGrupo()
+                        }
+                    })
+                }
+
+                const sugerenciasCorreo = () => {
+                    if ($("#correo").val().indexOf("@") !== -1) {
+                        const empresas = ["masconmenos.com.mx", "financieracultiva.com"]
+
+                        const correo = $("#correo").val().split("@")[0]
+                        const lista = empresas.map((empresa) => {
+                            return "<option value='" + correo + "@" + empresa + "'>" + correo + "@" + empresa + "</option>"
+                        })
+
+                        $("#sugerenciasCorreo").remove()
+                        const datalist = $("<datalist id='sugerenciasCorreo'>" + lista.join("") + "</datalist>")
+                        $("#correo").after(datalist).attr("list", "sugerenciasCorreo")
+                    } else {
+                        $("#sugerenciasCorreo").remove()
+                        $("#correo").attr("list", "")
+                    }
+                    validaCampos()
+                }
+
+                const seleccionGrupo = (id, grupo) => {
+                    $("#idGrupoSeleccionado").val(id)
+                    $("#grupoSeleccionado").text(grupo)
+                    getCorreoGrupo()
+                }
+
+                const eliminarGrupo = (id, grupo) => {
+                    confirmarMovimiento("Administración de correos", "¿Esta seguro de eliminar el grupo " + grupo + "?")
+                    .then((continuar) => {
+                        if (!continuar) return
+                        consultaServidor("/Creditos/EliminaGrupo", { grupo: id }, (respuesta) => {
+                            if (!respuesta.success) return showError(respuesta.mensaje || "Ocurrio un error al eliminar el grupo.")
+
+                            showSuccess("Grupo eliminado correctamente.")
+                            actualizaListaGrupos($("#idGrupoSeleccionado").val() === id ? null : $("#grupoSeleccionado").text())
+                        })
+                    })
+                }
+
+                const buscarGrupos = () => {
+                    $("#sinResultados").hide()
+                    const buscar = $("#buscarGrupo").val().toLowerCase()
+
+                    const encontrados = $("#grupoFiltro li").filter((index, element) => {
+                        const elemento = $(element).find(".nombreGrupo")
+                        const textoOriginal = elemento.text()
+                        const textoMinuscula = textoOriginal.toLowerCase()
+                        const indexMatch = textoMinuscula.indexOf(buscar)
+
+                        if (indexMatch !== -1) {
+                            const parteAntes = textoOriginal.substring(0, indexMatch)
+                            const parteCoincidente = textoOriginal.substring(indexMatch, indexMatch + buscar.length)
+                            const parteDespues = textoOriginal.substring(indexMatch + buscar.length)
+
+                            if (buscar === "") elemento.text(textoOriginal)
+                            else elemento.html(parteAntes + "<mark>" + parteCoincidente + "</mark>" + parteDespues)
+
+                            $(element).show()
+                            return true
+                        } else {
+                            elemento.text(textoOriginal)
+                            $(element).hide()
+                            return false
+                        }
+                    })
+
+                    if (encontrados.length === 0) $("#sinResultados").show()
+                }
+            </script>
+        HTML;
+
+        $prm = $this->GetParametros(true);
+        $prm = $prm['datos'];
+
+        View::set('header', $this->_contenedor->header(self::GetExtraHeader("Administración de correos")));
+        View::set('footer', $this->_contenedor->footer($extraFooter));
+        View::set('opcArea', $prm['area']);
+        View::set('opcSucursal', $prm['sucursal']);
+        View::set('opcGrupo', $prm['grupo']);
+        View::set('opcSucursales', $prm['sucursales']);
+        View::set('opcAreas', $prm['areas']);
+        View::render('creditos_adminCorreos');
+    }
+
+    public function GetParametros($ret = false)
+    {
+        $parametros = CreditosDao::GetParametrosCorreos();
+
+        $opcArea = "<option value='*'>Todas</option>";
+        $opcSucursal = "<option value='*'>Todas</option>";
+        $opcGrupo = "";
+        $opcSucursales = "<option value=''>Seleccione una sucursal</option>";
+        $opcAreas = "<option value=''>Selecciona una opción</option>";
+
+        if ($parametros['success']) {
+            foreach ($parametros['datos'] as $parametro) {
+                if ($parametro['TIPO'] === 'AREA') {
+                    $opcArea .= "<option value='{$parametro['VALOR']}'>{$parametro['MOSTRAR']}</option>";
+                    $opcAreas .= "<option value='{$parametro['VALOR']}'>{$parametro['MOSTRAR']}</option>";
+                }
+                if ($parametro['TIPO'] === 'SUCURSAL') $opcSucursal .= "<option value='{$parametro['VALOR']}'>{$parametro['MOSTRAR']}</option>";
+
+                if ($parametro['TIPO'] === 'GRUPO') {
+                    $boton = '';
+
+                    if ($parametro['USUARIOS'] == 0) $boton = "<button type='button' class='btn btn-danger btn-sm' onclick='eliminarGrupo(\"{$parametro['VALOR']}\", \"{$parametro['MOSTRAR']}\")' style='grid-column: 2;'>
+                        <span class='glyphicon glyphicon-trash'></span>
+                    </button>";
+
+                    $opcGrupo .= "<li class='dropdown-item d-flex justify-content-between align-items-center'>
+                        <div style='display: grid; grid-template-columns: 1fr auto .3fr; width: 100%; gap: 20px; align-items: center; padding: 5px;'>
+                            <span style='grid-column: 1; cursor: pointer;' class='nombreGrupo' onclick='seleccionGrupo(\"{$parametro['VALOR']}\", \"{$parametro['MOSTRAR']}\")'>{$parametro['MOSTRAR']}</span> 
+                            $boton
+                            <span style='grid-column: 3; text-align: right;'>{$parametro['USUARIOS']}&nbsp;<span class='glyphicon glyphicon-user'></span></span>
+                        </div>
+                    </li>";
+                }
+                if ($parametro['TIPO'] === 'SUCURSALES') $opcSucursales .= "<option value='{$parametro['VALOR']}'>{$parametro['MOSTRAR']}</option>";
+            }
+        }
+
+        $res = [
+            'success' => $parametros['success'],
+            'mensaje' => $parametros['mensaje'],
+            'datos' => [
+                'area' => $opcArea,
+                'sucursal' => $opcSucursal,
+                'grupo' => $opcGrupo,
+                'sucursales' => $opcSucursales,
+                'areas' => $opcAreas
+            ]
+        ];
+
+        if (!$ret) echo json_encode($res);
+        else return $res;
+    }
+
+    public function GetCorreos()
+    {
+        echo json_encode(CreditosDao::GetCorreos($_POST));
+    }
+
+    public function GetCorreosGrupo()
+    {
+        if (isset($_POST['grupo']) && $_POST['grupo'] !== '')
+            echo json_encode(CreditosDao::GetCorreosGrupo($_POST));
+        else echo json_encode(["success" => true, "datos" => []]);
+    }
+
+    public function AgregaCorreoGrupo()
+    {
+        $_POST['usuario'] = $this->__usuario;
+        echo json_encode(CreditosDao::AgregaCorreoGrupo($_POST));
+    }
+
+    public function EliminaCorreoGrupo()
+    {
+        echo json_encode(CreditosDao::EliminaCorreoGrupo($_POST));
+    }
+
+    public function AgregaCorreo()
+    {
+        $_POST['usuario'] = $this->__usuario;
+        echo json_encode(CreditosDao::AgregaCorreo($_POST));
+    }
+
+    public function AgregaGrupo()
+    {
+        $_POST['usuario'] = $this->__usuario;
+        echo json_encode(CreditosDao::AgregaGrupo($_POST));
+    }
+
+    public function EliminaGrupo()
+    {
+        echo json_encode(CreditosDao::EliminaGrupo($_POST));
+    }
 }
