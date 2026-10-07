@@ -261,8 +261,7 @@ class ImportacionPagosService
         $fecha = trim((string) ($datos['fecha'] ?? ''));
         $secuencia = trim((string) ($datos['secuencia'] ?? ''));
         $credito = str_pad(preg_replace('/\D/', '', (string) ($datos['credito'] ?? '')), 6, '0', STR_PAD_LEFT);
-        $ciclo = trim((string) ($datos['ciclo'] ?? ''));
-        $ciclo = str_pad(preg_replace('/\D/', '', $ciclo), 2, '0', STR_PAD_LEFT);
+        $ciclo = ImportacionPagosRepository::normalizarCiclo((string) ($datos['ciclo'] ?? ''));
         $usuario = trim((string) ($datos['usuario'] ?? ''));
 
         if ($fecha === '' || $secuencia === '' || $credito === '' || $ciclo === '') {
@@ -367,7 +366,7 @@ class ImportacionPagosService
                     $incidencia = true;
                     $motivo = $motivo !== '' ? $motivo : 'No se encontró un crédito entregado con esos datos.';
                 } else {
-                    $ciclo = str_pad(preg_replace('/\D/', '', (string) $prn['CICLO']), 2, '0', STR_PAD_LEFT);
+                    $ciclo = (string) $prn['CICLO'];
                     $cdgocpe = trim((string) ($prn['CDGOCPE'] ?? ' '));
                     if ($creditoPorPdi) {
                         $referencia = $repo->generarReferencia($credito, (string) ($prn['CDGTPC'] ?? ''));

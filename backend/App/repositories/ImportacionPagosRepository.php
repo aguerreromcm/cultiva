@@ -206,7 +206,7 @@ class ImportacionPagosRepository
             WHERE CDGEM = 'EMPFIN'
               AND CDGNS = :credito
               AND SITUACION = 'E'
-            ORDER BY TO_NUMBER(CICLO) ASC
+            ORDER BY CASE WHEN REGEXP_LIKE(CICLO, '^[0-9]+$') THEN 0 ELSE 1 END, LPAD(CICLO, 2, '0')
         SQL;
 
         try {
@@ -214,7 +214,7 @@ class ImportacionPagosRepository
             if (!is_array($row) || empty($row)) {
                 return null;
             }
-            $row['CICLO'] = str_pad(preg_replace('/\D/', '', (string) ($row['CICLO'] ?? '')), 2, '0', STR_PAD_LEFT);
+            $row['CICLO'] = self::normalizarCiclo((string) ($row['CICLO'] ?? ''));
             return $row;
         } catch (\Throwable $e) {
             return null;
@@ -236,16 +236,26 @@ class ImportacionPagosRepository
             FROM PRN
             WHERE CDGEM = 'EMPFIN'
               AND CDGNS = :credito
-              AND TO_NUMBER(CICLO) = TO_NUMBER(:ciclo)
+              AND CICLO = :ciclo
               AND SITUACION = 'E'
         SQL;
 
         try {
-            $row = $db->queryOne($sql, ['credito' => $credito, 'ciclo' => $ciclo]);
+            $row = $db->queryOne($sql, ['credito' => $credito, 'ciclo' => self::normalizarCiclo($ciclo)]);
             return is_array($row) && !empty($row) ? $row : null;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * El ciclo no siempre es numérico: devoluciones (D1, D2...) y reembolsos (R1, R2...).
+     * Solo los numéricos se completan a dos dígitos.
+     */
+    public static function normalizarCiclo(string $ciclo): string
+    {
+        $ciclo = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $ciclo));
+        return ctype_digit($ciclo) ? str_pad($ciclo, 2, '0', STR_PAD_LEFT) : $ciclo;
     }
 
     /**
