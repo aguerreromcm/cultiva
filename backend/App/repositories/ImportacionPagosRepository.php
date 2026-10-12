@@ -141,42 +141,6 @@ class ImportacionPagosRepository
         }
     }
 
-    /**
-     * Crédito registrado en PDI para una referencia BanCoppel "########### Transf. a FINANCIERA CULTIVA".
-     * Solo se acepta si la referencia corresponde a un único crédito.
-     */
-    public function creditoDesdePdi(string $referencia): ?string
-    {
-        $referencia = trim($referencia);
-        if ($referencia === '') {
-            return null;
-        }
-
-        $db = new Database();
-        if ($db->db_activa === null) {
-            return null;
-        }
-
-        $sql = <<<SQL
-            SELECT CDGCLNS
-            FROM PDI
-            WHERE REFERENCIA = :referencia
-                AND CDGCLNS IS NOT NULL
-            GROUP BY CDGCLNS
-        SQL;
-
-        try {
-            $filas = $db->queryAll($sql, ['referencia' => $referencia]);
-            if (!is_array($filas) || count($filas) !== 1) {
-                return null;
-            }
-            $credito = trim((string) ($filas[0]['CDGCLNS'] ?? ''));
-            return $credito !== '' ? $credito : null;
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
     /** @deprecated Usar siguienteIdLoteImportacion() */
     public function siguienteIdImportacion(): int
     {
@@ -494,6 +458,10 @@ class ImportacionPagosRepository
                 SUM(PD.MONTO) AS MONTO_TOTAL,
                 SUM(CASE WHEN PD.INCIDENCIA = 1 THEN 1 ELSE 0 END) AS INCIDENCIAS,
                 MIN(TO_CHAR(PD.FREGISTRO, 'DD/MM/YYYY HH24:MI:SS')) AS FECHA_CARGA,
+                SUM(CASE
+                    WHEN PD.ID_IMPORTACION IS NOT NULL OR PD.F_IMPORTACION IS NOT NULL THEN 1
+                    ELSE 0
+                END) AS PROCESADOS,
                 CASE
                     WHEN SUM(CASE
                         WHEN PD.ID_IMPORTACION IS NOT NULL OR PD.F_IMPORTACION IS NOT NULL THEN 1
@@ -559,6 +527,71 @@ class ImportacionPagosRepository
             unset($fila);
 
             return $filas;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Todos los pagos de los archivos seleccionados, indicando si ya se consideraron en el cierre.
+     *
+     * @param list<array{archivo: string, id_lote: int|null}> $lotes
+     * @return array<int, array<string, mixed>>
+     */
+    public function listarPagosExportacion(array $lotes): array
+    {
+        if ($lotes === []) {
+            return [];
+        }
+
+        $db = new Database();
+        if ($db->db_activa === null) {
+            return [];
+        }
+
+        $condiciones = [];
+        $params = [];
+        foreach (array_values($lotes) as $i => $lote) {
+            $cond = "PD.ARCHIVO = :archivo{$i}";
+            $params["archivo{$i}"] = $lote['archivo'];
+            if ($lote['id_lote'] !== null) {
+                $cond .= " AND PD.ID_LOTE_IMPORTACION = :lote{$i}";
+                $params["lote{$i}"] = $lote['id_lote'];
+            }
+            $condiciones[] = "({$cond})";
+        }
+        $filtro = implode(' OR ', $condiciones);
+
+        $sql = <<<SQL
+            SELECT
+                PD.ARCHIVO,
+                IB.NOMBRE AS CORRESPONSAL,
+                TO_CHAR(PD.FECHA, 'DD/MM/YYYY') AS FECHA,
+                PD.SECUENCIA,
+                NVL(PD.REFERENCIA_ORIGINAL, PD.REFERENCIA) AS REFERENCIA_ORIGINAL,
+                PD.REFERENCIA,
+                PD.CDGNS,
+                PD.CICLO,
+                PD.NOMBRE,
+                PD.MONTO,
+                CASE WHEN NVL(PD.INCIDENCIA, 0) = 1 OR PD.CDGNS = '000000' THEN 'Sí' ELSE 'No' END AS INCIDENCIA,
+                TRIM(PD.CDGPE_CORRIGE) AS CORREGIDO_POR,
+                TO_CHAR(PD.F_CORRIGE_REF, 'DD/MM/YYYY HH24:MI') AS FECHA_CORRECCION,
+                CASE WHEN PD.ID_IMPORTACION IS NOT NULL OR PD.F_IMPORTACION IS NOT NULL THEN 'Sí' ELSE 'No' END AS EN_CIERRE,
+                PD.ID_IMPORTACION,
+                TO_CHAR(PD.FREGISTRO, 'DD/MM/YYYY HH24:MI') AS FECHA_CARGA
+            FROM PAGOSDIA PD
+                LEFT JOIN CB ON CB.CDGEM = PD.CDGEM AND CB.CODIGO = PD.CDGCB
+                LEFT JOIN IB ON IB.CDGEM = CB.CDGEM AND IB.CODIGO = CB.CDGIB
+            WHERE PD.CDGEM = 'EMPFIN'
+              AND PD.ESTATUS = 'A'
+              AND ({$filtro})
+            ORDER BY PD.ARCHIVO, PD.FECHA, PD.SECUENCIA
+        SQL;
+
+        try {
+            $filas = $db->queryAll($sql, $params);
+            return is_array($filas) ? $filas : [];
         } catch (\Throwable $e) {
             return [];
         }

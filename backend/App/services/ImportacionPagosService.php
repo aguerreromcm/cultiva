@@ -205,6 +205,34 @@ class ImportacionPagosService
     }
 
     /**
+     * Pagos de los archivos seleccionados para el reporte de exportación.
+     * Cada lote viene como "archivo|id_lote" (el id puede ir vacío).
+     *
+     * @param list<string> $lotes
+     * @return array<int, array<string, mixed>>
+     */
+    public static function pagosExportacion(array $lotes): array
+    {
+        $seleccion = [];
+        foreach ($lotes as $lote) {
+            $lote = trim((string) $lote);
+            $pos = strrpos($lote, '|');
+            $archivo = trim($pos === false ? $lote : substr($lote, 0, $pos));
+            $idLote = $pos === false ? '' : trim(substr($lote, $pos + 1));
+            if ($archivo === '') {
+                continue;
+            }
+            $seleccion[$archivo . '|' . $idLote] = [
+                'archivo' => $archivo,
+                'id_lote' => ctype_digit($idLote) ? (int) $idLote : null,
+            ];
+        }
+
+        $repo = new ImportacionPagosRepository();
+        return $repo->listarPagosExportacion(array_values($seleccion));
+    }
+
+    /**
      * @return array Respuesta Model::Responde
      */
     public static function detalleImportacion(array $datos): array
@@ -329,24 +357,19 @@ class ImportacionPagosService
             $credito = null;
             $ciclo = null;
             $referencia = null;
-            $creditoPorPdi = false;
 
             if ($esPaycash) {
                 $refNorm = ImportacionPagosParser::normalizarReferenciaPaycash($refOriginal);
                 $esTransferencia = $corresponsal === ImportacionPagosParser::CORRESPONSAL_BANCOPPEL
                     && ImportacionPagosParser::esReferenciaTransferencia($refOriginal);
-                $creditoPdi = $esTransferencia ? $repo->creditoDesdePdi($refOriginal) : null;
 
-                if ($creditoPdi !== null) {
-                    $credito = $creditoPdi;
-                    $creditoPorPdi = true;
-                } elseif (!ImportacionPagosParser::referenciaPaycashValida($refNorm)) {
+                if ($esTransferencia || !ImportacionPagosParser::referenciaPaycashValida($refNorm)) {
                     $credito = '000000';
                     $ciclo = '00';
                     $referencia = $refOriginal;
                     $incidencia = true;
                     $motivo = $esTransferencia
-                        ? 'Transferencia sin un crédito único registrado en PDI.'
+                        ? 'Transferencia sin referencia de crédito; se debe identificar y corregir manualmente.'
                         : 'Referencia inválida (debe ser 10 caracteres e iniciar con P, C, 0 o 1).';
                 } else {
                     $credito = ImportacionPagosParser::extraerCredito($corresponsal, $refNorm);
@@ -368,16 +391,6 @@ class ImportacionPagosService
                 } else {
                     $ciclo = (string) $prn['CICLO'];
                     $cdgocpe = trim((string) ($prn['CDGOCPE'] ?? ' '));
-                    if ($creditoPorPdi) {
-                        $referencia = $repo->generarReferencia($credito, (string) ($prn['CDGTPC'] ?? ''));
-                        if ($referencia === null) {
-                            $credito = '000000';
-                            $ciclo = '00';
-                            $cdgocpe = ' ';
-                            $incidencia = true;
-                            $motivo = 'No se pudo generar la referencia del crédito encontrado en PDI.';
-                        }
-                    }
                 }
             }
 
