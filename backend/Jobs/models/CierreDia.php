@@ -111,20 +111,21 @@ class CierreDia extends Model
             FROM PAGOSDIA
             WHERE
                 ESTATUS = 'A'
-                AND TIPO IN ('P', 'G', 'X')
+                AND TIPO IN ('P', 'G')
                 AND MONTO != 0
                 AND TRUNC(FECHA) = TO_DATE(:fecha, 'DD/MM/YYYY')
         SQL;
 
         $det = <<<SQL
-            SELECT SUM(CASE WHEN ESTATUS = 1 THEN NO_REGISTROS ELSE 0 END) AS PAGOS_REGISTROS,
-                 SUM(CASE WHEN ESTATUS = 1 THEN MONTO ELSE 0 END) AS PAGOS_MONTO,
-                 SUM(CASE WHEN ESTATUS = 2 THEN NO_REGISTROS ELSE 0 END) AS GARANTIAS_REGISTROS,
-                 SUM(CASE WHEN ESTATUS = 2 THEN MONTO ELSE 0 END) AS GARANTIAS_MONTO,
-                 SUM(CASE WHEN ESTATUS = 3 THEN NO_REGISTROS ELSE 0 END) AS INCIDENCIAS_REGISTROS,
-                 SUM(CASE WHEN ESTATUS = 3 THEN MONTO ELSE 0 END) AS INCIDENCIAS_MONTO
-            FROM IMPORTACIONPAGDET
-            WHERE ID_IMPORTACION = :id_importacion
+            SELECT SUM(DECODE(VALIDACION, 0, 1, 0)) AS PAGOS_REGISTROS
+                , SUM(DECODE(VALIDACION, 0, MONTO, 0)) AS PAGOS_MONTO
+                , SUM(DECODE(VALIDACION, 1, 1, 0)) AS GARANTIAS_REGISTROS
+                , SUM(DECODE(VALIDACION, 1, MONTO, 0)) AS GARANTIAS_MONTO
+                , SUM(DECODE(VALIDACION, 2, 1, 0)) AS INCIDENCIAS_REGISTROS
+                , SUM(DECODE(VALIDACION, 2, MONTO, 0)) AS INCIDENCIAS_MONTO
+            FROM RES_IMPOR
+            WHERE IDENTIFICADOR = :id_proceso
+            AND CTABANCARIA <> '12'
         SQL;
 
         $mp = <<<SQL
@@ -154,7 +155,7 @@ class CierreDia extends Model
         try {
             $db = new Database();
             $res_pagos = $db->queryOne($pagos, ['fecha' => $datos['FECHA_CALCULO']]);
-            $res_det = $db->queryOne($det, ['id_importacion' => $datos['ID_IMPORTACION']]);
+            $res_det = $db->queryOne($det, ['id_proceso' => $datos['ID_PROCESO']]);
             $res_mp = $db->queryOne($mp, ['fecha' => $datos['FECHA_CALCULO']]);
             $res_garantias = $db->queryOne($garantias, ['id_proceso' => $datos['ID_PROCESO']]);
 
