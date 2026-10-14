@@ -497,6 +497,7 @@ class ImportacionPagosParser
                 if (!is_array($raw) || empty($raw)) {
                     continue;
                 }
+                self::sustituirCeldasFecha($hoja, $raw);
                 $filas = self::normalizarFilasExcel($raw);
                 // Prefiere la hoja que trae el encabezado BanCoppel.
                 if (self::buscarEncabezadoBanCoppel($filas) !== null) {
@@ -509,6 +510,32 @@ class ImportacionPagosParser
             return $mejor;
         } catch (\Throwable $e) {
             return [];
+        }
+    }
+
+    /**
+     * El formato "Fecha corta" de Excel se entrega como m/d/aaaa sin importar el idioma del archivo,
+     * lo que invierte día y mes cuando ambos son ≤ 12. Las celdas con fecha real se toman del valor serial.
+     *
+     * @param list<array<int, mixed>> $raw
+     */
+    private static function sustituirCeldasFecha(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $hoja, array &$raw): void
+    {
+        foreach ($hoja->getCellCollection()->getCoordinates() as $coordenada) {
+            $celda = $hoja->getCell($coordenada);
+            $valor = $celda->getValue();
+            if (!is_numeric($valor) || !\PhpOffice\PhpSpreadsheet\Shared\Date::isDateTime($celda)) {
+                continue;
+            }
+            $fila = $celda->getRow() - 1;
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($celda->getColumn()) - 1;
+            if (!isset($raw[$fila]) || !array_key_exists($col, $raw[$fila])) {
+                continue;
+            }
+            try {
+                $raw[$fila][$col] = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $valor)->format('Y-m-d');
+            } catch (\Throwable $e) {
+            }
         }
     }
 

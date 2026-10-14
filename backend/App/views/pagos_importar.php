@@ -94,13 +94,19 @@
                 </div>
                 <div class="body tab-content">
                     <div role="tabpanel" class="tab-pane active" id="tab-historial">
-                        <p class="ci-tab-intro">
-                            Archivos importados en los últimos 15 días. Un archivo ya importado no podrá cargarse de nuevo.
-                            Puede eliminarlo solo si ninguno de sus pagos ha sido procesado en el cierre.
-                        </p>
+                        <div class="ci-tab-intro-row">
+                            <p class="ci-tab-intro">
+                                Archivos importados en los últimos 15 días. Un archivo ya importado no podrá cargarse de nuevo.
+                                Puede eliminarlo solo si ninguno de sus pagos ha sido procesado en el cierre.
+                            </p>
+                            <button type="button" id="btn_exportar_pagos" class="btn btn-success btn-sm" disabled>
+                                <i class="fa fa-file-excel-o"></i> Exportar pagos seleccionados <span id="exp_contador"></span>
+                            </button>
+                        </div>
                         <table class="table table-striped table-bordered table-hover" id="tabla-historial-importacion">
                             <thead>
                                 <tr>
+                                    <th class="ci-col-check"><input type="checkbox" id="exp_todos" title="Seleccionar todos"></th>
                                     <th>Archivo</th>
                                     <th>Fecha pago</th>
                                     <th>Registros</th>

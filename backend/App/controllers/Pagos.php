@@ -35,6 +35,7 @@ class Pagos extends Controller
             {$this->consultaServidor}
             {$this->configuraTabla}
             {$this->actualizaDatosTabla}
+            {$this->descargaExcel}
 
             const idTablaPreview = "tabla-preview-importacion";
             const idTablaHistorial = "tabla-historial-importacion";
@@ -42,6 +43,8 @@ class Pagos extends Controller
             const idTablaDetalle = "tabla-detalle-importacion";
 
             let previewActual = null;
+            let historialActual = [];
+            const seleccionExport = new Set();
             let estadoCierre = {$estadoCierre};
             let cierreEnProceso = !!estadoCierre.ejecutando;
             let fechaCierreProceso = estadoCierre.fecha || null;
@@ -199,12 +202,36 @@ class Pagos extends Controller
                 return html;
             };
 
+            const claveExport = (f) => (f.ARCHIVO || "") + "|" + (f.ID_LOTE_IMPORTACION != null ? f.ID_LOTE_IMPORTACION : "");
+
+            const actualizaBotonExportar = () => {
+                const n = seleccionExport.size;
+                $("#exp_contador").text(n > 0 ? "(" + n + ")" : "");
+                $("#btn_exportar_pagos").prop("disabled", cierreEnProceso || n === 0);
+                $("#exp_todos").prop("checked", historialActual.length > 0 && n === historialActual.length);
+            };
+
+            const renderEstadoCierre = (f) => {
+                const total = parseInt(f.REGISTROS, 10) || 0;
+                const procesados = parseInt(f.PROCESADOS, 10) || 0;
+                if (procesados === 0) return "<span class='ci-estado-cierre ci-estado-pendiente'>Pendiente de cierre</span>";
+                if (procesados >= total) return "<span class='ci-estado-cierre ci-estado-procesado'><i class='fa fa-check'></i> Procesado en cierre</span>";
+                return "<span class='ci-estado-cierre ci-estado-parcial'>Procesado parcial (" + procesados + " de " + total + ")</span>";
+            };
+
             const cargarHistorial = () => {
                 $.getJSON("/Pagos/ListarHistorial/", (res) => {
                     if (!res || !res.success) return;
-                    const datos = (res.datos || []).map((f) => {
+                    historialActual = res.datos || [];
+                    const vigentes = new Set(historialActual.map(claveExport));
+                    [...seleccionExport].forEach((k) => { if (!vigentes.has(k)) seleccionExport.delete(k); });
+                    const datos = historialActual.map((f) => {
                         const archivo = f.ARCHIVO || "";
                         const idLote = f.ID_LOTE_IMPORTACION != null ? f.ID_LOTE_IMPORTACION : (f.ID_IMPORTACION != null ? f.ID_IMPORTACION : "");
+                        const clave = claveExport(f);
+                        const chk = "<input type='checkbox' class='chk-export' title='Incluir en la exportación' value='"
+                            + String(clave).replace(/&/g, "&amp;").replace(/'/g, "&#39;") + "'"
+                            + (seleccionExport.has(clave) ? " checked" : "") + ">";
                         const puedeEliminar = parseInt(f.PUEDE_ELIMINAR, 10) === 1;
                         const desglose = f.DESGLOSE || [];
                         const multi = desglose.length > 1 || parseInt(f.NUM_FECHAS, 10) > 1;
@@ -233,16 +260,18 @@ class Pagos extends Controller
                         const archivoHtml = '<span class="celda-principal">' + (archivo || "-") + "</span>"
                             + (f.CORRESPONSAL ? '<span class="celda-secundaria">' + f.CORRESPONSAL + "</span>" : "");
                         return [
+                            chk,
                             archivoHtml,
                             fechaHtml,
                             registrosHtml,
                             montoHtml,
                             incidenciasHtml,
                             f.FECHA_CARGA || f.F_IMPORTACION || "-",
-                            btnVer + btnEliminar
+                            '<div class="ci-accion-cell">' + btnVer + btnEliminar + "</div>" + renderEstadoCierre(f)
                         ];
                     });
                     actualizaDatosTabla(idTablaHistorial, datos);
+                    actualizaBotonExportar();
                 });
             };
 
@@ -435,6 +464,7 @@ class Pagos extends Controller
                 $("body").toggleClass("ci-cierre-en-proceso", b);
                 $("#corresponsal, #archivo_layout, #btn_previsualizar, #fecha_cierre, #btn_procesar_cierre, #btn_guardar_correccion, #corr_credito, #corr_ciclo")
                     .prop("disabled", b);
+                actualizaBotonExportar();
                 if (b) {
                     $("#modalPreviewImportacion, #modalCorregirIncidencia, #modalDetalleImportacion").modal("hide");
                     previewActual = null;
@@ -617,8 +647,11 @@ class Pagos extends Controller
                 $("#" + idTablaPreview).DataTable(opcionesTabla());
                 $("#" + idTablaHistorial).DataTable({
                     ...opcionesTabla(),
-                    order: [[5, "desc"]],
-                    columnDefs: [{ orderable: false, targets: 6 }]
+                    order: [[6, "desc"]],
+                    columnDefs: [
+                        { orderable: false, targets: [0, 7] },
+                        { className: "ci-col-check", targets: 0 }
+                    ]
                 });
                 $("#" + idTablaIncidencias).DataTable({ ...opcionesTabla(), order: [[0, "desc"]] });
                 $("#" + idTablaDetalle).DataTable(opcionesTabla());
@@ -702,6 +735,27 @@ class Pagos extends Controller
                     });
                 });
 
+                $("#" + idTablaHistorial).on("change", ".chk-export", function () {
+                    if (this.checked) seleccionExport.add(this.value);
+                    else seleccionExport.delete(this.value);
+                    actualizaBotonExportar();
+                });
+
+                $("#exp_todos").on("click", (e) => e.stopPropagation()).change(function () {
+                    seleccionExport.clear();
+                    if (this.checked) historialActual.forEach((f) => seleccionExport.add(claveExport(f)));
+                    $($("#" + idTablaHistorial).DataTable().rows().nodes()).find(".chk-export").prop("checked", this.checked);
+                    actualizaBotonExportar();
+                });
+
+                $("#btn_exportar_pagos").click(() => {
+                    if (bloqueadoPorCierre()) return;
+                    if (!seleccionExport.size) return showWarning("Seleccione al menos un archivo.");
+                    const params = new URLSearchParams();
+                    seleccionExport.forEach((k) => params.append("lotes[]", k));
+                    descargaExcel("/Pagos/ExportarPagos/?" + params.toString());
+                });
+
                 const hoy = new Date();
                 $("#fecha_cierre")
                     .attr("max", hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0") + "-" + String(hoy.getDate()).padStart(2, "0"))
@@ -752,6 +806,37 @@ class Pagos extends Controller
     public function ListarHistorial()
     {
         echo json_encode(ImportacionPagosService::listarHistorial());
+    }
+
+    public function ExportarPagos()
+    {
+        $lotes = $_GET['lotes'] ?? [];
+        $lotes = is_array($lotes) ? $lotes : [$lotes];
+
+        $centrado = ['estilo' => \PHPSpreadsheet::GetEstilosExcel('centrado')];
+        $texto = ['estilo' => \PHPSpreadsheet::GetEstilosExcel('texto_centrado')];
+        $columnas = [
+            \PHPSpreadsheet::ColumnaExcel('ARCHIVO', 'Archivo'),
+            \PHPSpreadsheet::ColumnaExcel('CORRESPONSAL', 'Corresponsal', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('FECHA', 'Fecha de pago', ['estilo' => \PHPSpreadsheet::GetEstilosExcel('fecha')]),
+            \PHPSpreadsheet::ColumnaExcel('REFERENCIA_ORIGINAL', 'Referencia en archivo', ['estilo' => \PHPSpreadsheet::GetEstilosExcel('texto_izquierda')]),
+            \PHPSpreadsheet::ColumnaExcel('REFERENCIA', 'Referencia', $texto),
+            \PHPSpreadsheet::ColumnaExcel('CDGNS', 'Crédito', $texto),
+            \PHPSpreadsheet::ColumnaExcel('CICLO', 'Ciclo', $texto),
+            \PHPSpreadsheet::ColumnaExcel('NOMBRE', 'Nombre'),
+            \PHPSpreadsheet::ColumnaExcel('MONTO', 'Monto', ['estilo' => \PHPSpreadsheet::GetEstilosExcel('moneda'), 'total' => true]),
+            \PHPSpreadsheet::ColumnaExcel('INCIDENCIA', 'Incidencia', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('CORREGIDO_POR', 'Corregido por', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('FECHA_CORRECCION', 'Fecha de corrección', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('EN_CIERRE', 'Considerado en cierre', $centrado),
+            \PHPSpreadsheet::ColumnaExcel('FECHA_CARGA', 'Fecha de importación', $centrado),
+        ];
+
+        $filas = array_map(
+            fn($fila) => array_map(fn($valor) => $valor ?? '', $fila),
+            ImportacionPagosService::pagosExportacion($lotes)
+        );
+        \PHPSpreadsheet::DescargaExcel('Pagos importados Cultiva', 'Pagos', 'Pagos importados', $columnas, $filas);
     }
 
     public function DetalleImportacion()
