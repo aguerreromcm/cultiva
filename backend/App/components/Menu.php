@@ -109,6 +109,7 @@ class Menu
         return [
             $this->enlace('Reporte de Referencias', '/Creditos/ReporteReferencias/', $permisos),
             $this->enlace('Reporte de Prestamos', '/Creditos/ReportePrestamos/', $permisos),
+            $this->enlace('Reasignación', '/Creditos/Reasignacion/', ['ADMIN', 'CAMAG', 'ORHM', 'MAPH']),
         ];
     }
 
@@ -137,7 +138,6 @@ class Menu
     private function opcionesOperaciones()
     {
         return [
-            $this->enlace('Cambio de Sucursal', '/Creditos/CambioSucursal/', ['ADMIN', 'CAMAG', 'ORHM', 'MAPH']),
             $this->enlace('Cierre de día', '/Pagos/CierreDia/', ['ADMIN', 'OFCLD', 'PLMV', 'LGFR', 'AMGM', 'GASC']),
         ];
     }

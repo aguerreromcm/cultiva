@@ -292,4 +292,49 @@ class Database
             throw new \Exception("Error en EjecutaSP: " . $e->getMessage() . "\nSP: $sp \nDatos: " . print_r($parametros, 1));
         }
     }
+
+    public function queryProcedureReasignaciones(
+        $credito,
+        $ciclo,
+        $nuevoAsesor,
+        $nuevaSucursal,
+        $usuario
+    ) {
+        $estatus = '';
+        $resultado = '';
+        $nuevoAsesor = trim((string) $nuevoAsesor);
+        $nuevaSucursal = trim((string) $nuevaSucursal);
+
+        $sql = 'BEGIN SP_REASIGNACIONES(
+            :p_credito,
+            :p_ciclo,
+            :p_nuevo_asesor,
+            :p_nueva_sucursal,
+            :p_usuario,
+            :p_estatus,
+            :p_resultado
+        ); END;';
+
+        try {
+            $stmt = $this->db_activa->prepare($sql);
+            $stmt->bindValue(':p_credito', trim((string) $credito), PDO::PARAM_STR);
+            $stmt->bindValue(':p_ciclo', trim((string) $ciclo), PDO::PARAM_STR);
+            $stmt->bindValue(':p_nuevo_asesor', $nuevoAsesor !== '' ? $nuevoAsesor : null, $nuevoAsesor !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+            $stmt->bindValue(':p_nueva_sucursal', $nuevaSucursal !== '' ? $nuevaSucursal : null, $nuevaSucursal !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+            $stmt->bindValue(':p_usuario', trim((string) $usuario), PDO::PARAM_STR);
+            $stmt->bindParam(':p_estatus', $estatus, PDO::PARAM_STR | PDO::PARAM_INPUT_OUTPUT, 20);
+            $stmt->bindParam(':p_resultado', $resultado, PDO::PARAM_STR | PDO::PARAM_INPUT_OUTPUT, 4000);
+            $stmt->execute();
+
+            return [
+                'ESTATUS' => trim((string) $estatus),
+                'RESULTADO' => trim((string) $resultado),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ESTATUS' => 'ERROR',
+                'RESULTADO' => $e->getMessage(),
+            ];
+        }
+    }
 }

@@ -6,7 +6,9 @@ defined("APPPATH") or die("Access denied");
 
 use Core\View;
 use Core\Controller;
+use Core\MasterDom;
 use App\models\Creditos as CreditosDao;
+use App\services\ReasignacionService;
 
 class Creditos extends Controller
 {
@@ -172,80 +174,233 @@ class Creditos extends Controller
         \PHPSpreadsheet::DescargaExcel('Referencias Cultiva', 'Reporte', 'Referencias', $columnas, $filas);
     }
 
-    public function CambioSucursal()
+    public function Reasignacion()
     {
-        $extraFooter = <<<HTML
-            <script>
-                function getParameterByName(name) {
-                    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]")
-                    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-                        results = regex.exec(location.search)
-                    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
+        $credito = trim((string) ($_GET['Credito'] ?? ''));
+        $registros = [];
+        $mensajeError = (string) ($_SESSION['reasignacion_error'] ?? '');
+        unset($_SESSION['reasignacion_error']);
+
+        $cambios = isset($_SESSION['reasignacion_cambios']) && is_array($_SESSION['reasignacion_cambios'])
+            ? $_SESSION['reasignacion_cambios']
+            : [];
+        unset($_SESSION['reasignacion_cambios']);
+
+        $resultadoMasivo = isset($_SESSION['reasignacion_resultado']) && is_array($_SESSION['reasignacion_resultado'])
+            ? $_SESSION['reasignacion_resultado']
+            : null;
+        unset($_SESSION['reasignacion_resultado']);
+
+        if ($credito !== '') {
+            $consulta = CreditosDao::SelectCreditoReasignacion($credito);
+            if (is_array($consulta)) {
+                foreach ($consulta as $fila) {
+                    if (!is_array($fila) || trim((string) ($fila['GRUPO'] ?? '')) === '') {
+                        continue;
+                    }
+                    $registros[] = $this->marcarReasignacionAplicada($fila, $cambios);
                 }
-
-                function enviar_add(ciclo_p) {
-                    credito = getParameterByName("Credito")
-                    sucursal = document.getElementById("sucursal").value
-                    ciclo = ciclo_p
-
-                    $.ajax({
-                        type: "POST",
-                        url: "/Creditos/UpdateSucursal/",
-                        data: { credito, sucursal, ciclo },
-                        success: function (respuesta) {
-                            respuesta = JSON.parse(respuesta)
-                            if (respuesta.success) {
-                                location.reload()
-                            } else {
-                                swal(respuesta.mensaje, {
-                                    icon: "error"
-                                })
-                            }
-                        }
-                    })
-                }
-                
-                function EditarSucursal(id_suc) {
-                    credito = getParameterByName("Credito");
-                    id_sucursal = id_suc;
-
-                    $("#modal_cambio_sucursal").modal("show");
-                }
-            </script>
-        HTML;
-
-        $credito = $_GET['Credito'];
-        $vista = "cambio_sucursal_all";
-
-        if ($credito != '') {
-            $credito_cambio = CreditosDao::SelectSucursalAllCreditoCambioSuc(['credito' => $credito]);
-
-            if (!$credito_cambio['success'] || !isset($credito_cambio['datos'])) {
-                $vista = "cambio_sucursal_busqueda_message";
-            } else {
-                $datos = $credito_cambio['datos'];
-                $sucursales = CreditosDao::ListaSucursales();
-                $ComboSucursal = '';
-                foreach ($sucursales['datos'] as $key => $val2) {
-                    $selected = $val2['ID_SUCURSAL'] == $datos['ID_SUCURSAL'] ? 'selected' : '';
-                    $ComboSucursal .= "<option $selected value='{$val2['ID_SUCURSAL']}'>{$val2['SUCURSAL']}</option>";
-                }
-
-                View::set('Administracion', $datos);
-                View::set('sucursal', $ComboSucursal);
-                $vista = "cambio_sucursal_busqueda";
+            }
+            if ($registros === []) {
+                $mensajeError = 'No se encontró información para el crédito solicitado.';
             }
         }
 
-        View::set('header', $this->_contenedor->header(self::GetExtraHeader("Cambio de Sucursal")));
-        View::set('footer', $this->_contenedor->footer($extraFooter));
+        $extraHeader = '<title>Reasignación</title><link rel="shortcut icon" href="/img/logo.svg" type="image/x-icon">';
+        View::set('header', $this->_contenedor->header($extraHeader));
+        View::set('footer', $this->_contenedor->footer());
         View::set('credito', $credito);
-        View::render($vista);
+        View::set('registros', $registros);
+        View::set('asesores', CreditosDao::ListaAsesoresReasignacion());
+        View::set('sucursales', CreditosDao::ListaSucursalesReasignacion());
+        View::set('mensaje_error', $mensajeError);
+        View::set('resultado_masivo', $resultadoMasivo);
+        View::render('reasignacion');
     }
 
-    public function UpdateSucursal()
+    public function UpdateReasignacion()
     {
-        echo json_encode(CreditosDao::UpdateSucursal($_POST));
+        header('Content-Type: application/json; charset=utf-8');
+        $credito = trim((string) MasterDom::getDataAll('credito'));
+        $ciclo = trim((string) MasterDom::getDataAll('ciclo'));
+        $asesor = trim((string) MasterDom::getDataAll('asesor'));
+        $sucursal = trim((string) MasterDom::getDataAll('sucursal'));
+
+        if ($credito === '' || $ciclo === '') {
+            echo json_encode(['estatus' => 'ERROR', 'resultado' => 'Crédito y ciclo son obligatorios.']);
+            return;
+        }
+        if ($asesor === '' && $sucursal === '') {
+            echo json_encode(['estatus' => 'ERROR', 'resultado' => 'Debe seleccionar un asesor, una sucursal o ambos.']);
+            return;
+        }
+
+        $antes = CreditosDao::SelectCreditoReasignacion($credito, $ciclo);
+        $resultado = CreditosDao::EjecutarReasignacion(
+            $credito,
+            $ciclo,
+            $asesor,
+            $sucursal,
+            (string) $this->__usuario
+        );
+
+        $estatus = strtoupper(trim((string) ($resultado['ESTATUS'] ?? 'ERROR')));
+        if ($estatus === 'OK') {
+            if (!isset($_SESSION['reasignacion_cambios']) || !is_array($_SESSION['reasignacion_cambios'])) {
+                $_SESSION['reasignacion_cambios'] = [];
+            }
+            $_SESSION['reasignacion_cambios'][$this->claveReasignacion($credito, $ciclo)] = [
+                'asesor' => is_array($antes) ? trim((string) ($antes['EJECUTIVO'] ?? '')) : '',
+                'sucursal' => is_array($antes) ? trim((string) ($antes['SUCURSAL'] ?? '')) : '',
+            ];
+        }
+
+        echo json_encode([
+            'estatus' => $estatus,
+            'resultado' => trim((string) ($resultado['RESULTADO'] ?? 'No fue posible realizar la reasignación.')),
+            'redirect' => '/Creditos/Reasignacion/?Credito=' . rawurlencode($credito),
+        ]);
+    }
+
+    private function claveReasignacion(string $credito, string $ciclo): string
+    {
+        return trim($credito) . '|' . trim($ciclo);
+    }
+
+    /**
+     * Las columnas "nuevo" se derivan del estado actual del crédito: la sesión
+     * solo guarda el valor previo para poder contrastarlo tras la reasignación.
+     */
+    private function marcarReasignacionAplicada(array $fila, array $cambios): array
+    {
+        $asesorActual = trim((string) ($fila['EJECUTIVO'] ?? ''));
+        $sucursalActual = trim((string) ($fila['SUCURSAL'] ?? ''));
+
+        $fila['ASESOR_ANTERIOR'] = $asesorActual;
+        $fila['ASESOR_NUEVO'] = '';
+        $fila['SUCURSAL_ANTERIOR'] = $sucursalActual;
+        $fila['SUCURSAL_NUEVA'] = '';
+
+        $clave = $this->claveReasignacion(
+            (string) ($fila['NO_CREDITO'] ?? ''),
+            (string) ($fila['CICLO'] ?? '')
+        );
+        if (!isset($cambios[$clave]) || !is_array($cambios[$clave])) {
+            return $fila;
+        }
+
+        $asesorPrevio = trim((string) ($cambios[$clave]['asesor'] ?? ''));
+        $sucursalPrevia = trim((string) ($cambios[$clave]['sucursal'] ?? ''));
+
+        if ($asesorPrevio !== '' && $asesorPrevio !== $asesorActual) {
+            $fila['ASESOR_ANTERIOR'] = $asesorPrevio;
+            $fila['ASESOR_NUEVO'] = $asesorActual;
+        }
+        if ($sucursalPrevia !== '' && $sucursalPrevia !== $sucursalActual) {
+            $fila['SUCURSAL_ANTERIOR'] = $sucursalPrevia;
+            $fila['SUCURSAL_NUEVA'] = $sucursalActual;
+        }
+
+        return $fila;
+    }
+
+    public function ReasignacionLayout()
+    {
+        $estilos = \PHPSpreadsheet::GetEstilosExcel();
+        $texto = ['estilo' => $estilos['texto_centrado']];
+        $columnas = [
+            \PHPSpreadsheet::ColumnaExcel('GRUPO', '[GRUPO]', $texto),
+            \PHPSpreadsheet::ColumnaExcel('CICLO', 'CICLO', $texto),
+            \PHPSpreadsheet::ColumnaExcel('ASESOR', '[ASESOR]', $texto),
+            \PHPSpreadsheet::ColumnaExcel('EMPRESA', '[EMPRESA]', $texto),
+            \PHPSpreadsheet::ColumnaExcel('NOM_SUCURSAL', '[NOM_SUCURSAL]'),
+        ];
+        \PHPSpreadsheet::DescargaExcel(
+            'layout_reasignacion',
+            'Reasignacion',
+            'Reasignación',
+            $columnas,
+            []
+        );
+    }
+
+    public function ReasignacionCargaMasiva()
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            header('Location: /Creditos/Reasignacion/');
+            exit;
+        }
+        if (!isset($_FILES['archivo']) || !is_uploaded_file($_FILES['archivo']['tmp_name'])) {
+            $this->redirigirReasignacionConError('No se recibió el archivo Excel.');
+        }
+        if ($_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
+            $this->redirigirReasignacionConError(
+                'Error al subir el archivo (código ' . (int) $_FILES['archivo']['error'] . ').'
+            );
+        }
+
+        $extension = strtolower((string) pathinfo((string) $_FILES['archivo']['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, ['xlsx', 'xls'], true)) {
+            $this->redirigirReasignacionConError('El archivo debe ser Excel (.xls o .xlsx).');
+        }
+
+        $directorio = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tmp';
+        if (!is_dir($directorio)) {
+            @mkdir($directorio, 0755, true);
+        }
+        $destino = $directorio . DIRECTORY_SEPARATOR . 'reasignacion_' . uniqid('', true) . '.' . $extension;
+        $guardado = @move_uploaded_file($_FILES['archivo']['tmp_name'], $destino);
+        if (!$guardado) {
+            $guardado = @copy($_FILES['archivo']['tmp_name'], $destino);
+        }
+        if (!$guardado || !is_readable($destino)) {
+            $destinoAlterno = sys_get_temp_dir()
+                . DIRECTORY_SEPARATOR
+                . 'reasignacion_' . uniqid('', true) . '.' . $extension;
+            $guardado = @copy($_FILES['archivo']['tmp_name'], $destinoAlterno);
+            if ($guardado && is_readable($destinoAlterno)) {
+                $destino = $destinoAlterno;
+            } else {
+                @unlink($destino);
+                @unlink($destinoAlterno);
+                $this->redirigirReasignacionConError(
+                    'No se pudo guardar el archivo recibido para procesarlo.'
+                );
+            }
+        }
+
+        try {
+            $resultado = ReasignacionService::cargaMasivaDesdeArchivo(
+                $destino,
+                (string) $this->__usuario
+            );
+        } catch (\Throwable $e) {
+            $resultado = [
+                'success' => false,
+                'mensaje' => 'No fue posible procesar el archivo.',
+                'error' => $e->getMessage(),
+            ];
+        } finally {
+            @unlink($destino);
+        }
+
+        $datos = $resultado['datos'] ?? [];
+        $_SESSION['reasignacion_resultado'] = [
+            'resumen' => $resultado['mensaje'] ?? '',
+            'detalle_error' => $resultado['error'] ?? '',
+            'actualizados' => $datos['actualizados'] ?? [],
+            'errores' => $datos['errores'] ?? [],
+            'exito' => !empty($resultado['success']),
+        ];
+        header('Location: /Creditos/Reasignacion/');
+        exit;
+    }
+
+    private function redirigirReasignacionConError(string $mensaje): void
+    {
+        $_SESSION['reasignacion_error'] = $mensaje;
+        header('Location: /Creditos/Reasignacion/');
+        exit;
     }
 
     public function ReportePrestamos()

@@ -136,89 +136,124 @@ class Creditos extends Model
         }
     }
 
-    public static function SelectSucursalAllCreditoCambioSuc($datos)
+    public static function SelectCreditoReasignacion($noCredito, $ciclo = null)
     {
-        $qry = <<<SQL
+        $noCredito = self::normalizarNumeroCredito($noCredito);
+        if ($noCredito === '') return null;
+
+        $query = <<<SQL
             SELECT 
-                PRN.CDGNS CREDITO
-                , NS.NOMBRE GRUPO
-                , PRN.CICLO
-                , PRN.CANTENTRE MONTO
-                , PRN.SITUACION
-                , PRN.CDGCO ID_SUCURSAL
-                , GET_NOMBRE_SUCURSAL(PRN.CDGCO) SUCURSAL
-                , GET_NOMBRE_EMPLEADO(PRN.CDGOCPE) EJECUTIVO
+                TRIM(SN.CDGNS) NO_CREDITO,
+                NS.NOMBRE GRUPO,
+                TRIM(SN.CICLO) CICLO,
+                NVL(SN.CANTAUTOR, SN.CANTSOLIC) MONTO,
+                SN.SITUACION,
+                TRIM(SN.CDGCO) ID_SUCURSAL,
+                GET_NOMBRE_SUCURSAL(SN.CDGCO) SUCURSAL,
+                TRIM(SN.CDGOCPE) ID_ASESOR,
+                GET_NOMBRE_EMPLEADO(SN.CDGOCPE) EJECUTIVO
             FROM 
-                PRN
-                JOIN NS ON NS.CODIGO = PRN.CDGNS
+                SN
+                LEFT JOIN NS ON NS.CDGEM = SN.CDGEM AND NS.CODIGO = SN.CDGNS
             WHERE
-                PRN.CDGNS = :credito
-                AND PRN.CDGEM = 'EMPFIN'
-                AND PRN.SITUACION != 'T'
-            order BY
-                PRN.INICIO DESC
-        SQL;
-
-        $prm = [
-            'credito' => $datos['credito']
-        ];
-
-        try {
-            $db = new Database();
-            $res = $db->queryOne($qry, $prm);
-            return self::Responde(true, "Consulta exitosa", $res);
-        } catch (\Exception $e) {
-            return self::Responde(false, 'Error al ejecutar la consulta', null, $e->getMessage());
-        }
-    }
-
-    public static function ListaSucursales()
-    {
-        $qry = <<<SQL
-            SELECT DISTINCT 
-                RG.CODIGO ID_REGION,
-                RG.NOMBRE REGION,
-                CO.CODIGO ID_SUCURSAL,
-                CO.NOMBRE SUCURSAL
-            FROM
-                PCO, CO, RG
-            WHERE
-                PCO.CDGCO = CO.CODIGO
-                AND CO.CDGRG = RG.CODIGO 
-                AND PCO.CDGEM = 'EMPFIN'
+                SN.CDGEM = 'EMPFIN'
+                AND SN.CDGNS = :credito
+                AND SN.CICLO FILTRO_CICLO
             ORDER BY
-                    SUCURSAL ASC
+                SN.INICIO DESC
         SQL;
 
-        try {
-            $db = new Database();
-            $res = $db->queryAll($qry);
-            return self::Responde(true, "Consulta exitosa", $res);
-        } catch (\Exception $e) {
-            return self::Responde(false, 'Error al ejecutar la consulta', null, $e->getMessage());
-        }
-    }
-
-    public static function UpdateSucursal($datos)
-    {
-        $sp = "SPACTUALIZASUC('EMPFIN', :credito, :ciclo, :sucursal, :output)";
-
-        $prm = [
-            'credito' => $datos['credito'],
-            'ciclo' => $datos['ciclo'],
-            'sucursal' => $datos['sucursal']
+        $params = [
+            'credito' => $noCredito
         ];
 
         try {
             $db = new Database();
-            $res = $db->EjecutaSP($sp, $prm);
-            if ($res == '1 Proceso realizado exitosamente')
-                return self::Responde(true, "Sucursal actualizada correctamente", $res);
-            else
-                return self::Responde(false, "Error al actualizar la sucursal", $res);
+
+            if ($ciclo !== null) {
+                $query = str_replace('SN.CICLO FILTRO_CICLO', 'TRIM(SN.CICLO) = :ciclo', $query);
+                $ciclo = trim((string) $ciclo);
+                $params['ciclo'] = $ciclo;
+                return $db->queryOne($query, $params);
+            } else {
+                $query = str_replace('FILTRO_CICLO', "NOT LIKE 'R%'", $query);
+                return $db->queryAll($query, $params);
+            }
         } catch (\Exception $e) {
-            return self::Responde(false, 'Error al ejecutar la consulta', null, $e->getMessage());
+            return null;
         }
+    }
+
+    private static function normalizarNumeroCredito($noCredito): string
+    {
+        $noCredito = trim((string) $noCredito);
+        if ($noCredito === '') {
+            return '';
+        }
+
+        if (ctype_digit($noCredito) && strlen($noCredito) < 6) {
+            return str_pad($noCredito, 6, '0', STR_PAD_LEFT);
+        }
+
+        return $noCredito;
+    }
+
+    public static function ListaSucursalesReasignacion()
+    {
+        //////cambiar el parametro CDGPE
+        $query = <<<sql
+        SELECT DISTINCT 
+            RG.CODIGO ID_REGION,
+            RG.NOMBRE REGION,
+            CO.CODIGO ID_SUCURSAL,
+            CO.NOMBRE SUCURSAL
+        FROM
+            PCO, CO, RG
+        WHERE
+            PCO.CDGCO = CO.CODIGO
+            AND CO.CDGRG = RG.CODIGO 
+            AND PCO.CDGEM = 'EMPFIN'
+        ORDER BY
+	            SUCURSAL ASC
+sql;
+
+        $mysqli = new Database();
+        return $mysqli->queryAll($query);
+    }
+
+    public static function ListaAsesoresReasignacion()
+    {
+        $query = <<<SQL
+            SELECT
+                TRIM(PE.CODIGO) ID_ASESOR,
+                CONCATENA_NOMBRE(PE.NOMBRE1, PE.NOMBRE2, PE.PRIMAPE, PE.SEGAPE) ASESOR,
+                TRIM(PE.CDGCO) ID_SUCURSAL
+            FROM PE
+            WHERE PE.CDGEM = 'EMPFIN'
+              AND PE.ACTIVO = 'S'
+              AND (PE.BLOQUEO = 'N' OR PE.BLOQUEO IS NULL)
+            ORDER BY ASESOR ASC
+        SQL;
+
+        $db = new Database();
+        return $db->queryAll($query);
+    }
+
+    public static function EjecutarReasignacion(
+        $credito,
+        $ciclo,
+        $nuevoAsesor,
+        $nuevaSucursal,
+        $usuario
+    ) {
+        $db = new Database();
+        return $db->queryProcedureReasignaciones(
+            $credito,
+            $ciclo,
+            $nuevoAsesor,
+            $nuevaSucursal,
+            $usuario
+        );
     }
 
     public static function GetReportePrestamos($datos)
