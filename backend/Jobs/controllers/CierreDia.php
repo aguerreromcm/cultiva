@@ -39,7 +39,6 @@ class CierreDia extends Job
         }
 
         $mensajeRes = null;
-        $exito = 0;
         $datos = [
             'fecha' => $fecha,
             'usuario' => $usuario,
@@ -56,10 +55,8 @@ class CierreDia extends Job
                 $resultado['datos']['MENSAJE'] = $mensajeRes;
             }
 
-            if ($resultado['success']) {
-                $exito = 1;
-                $mensaje = "Cierre de día concluido: fecha $fecha - usuario $usuario";
-            } else {
+            $mensaje = "Cierre de día concluido: fecha $fecha - usuario $usuario";
+            if (!$resultado['success']) {
                 $error = isset($resultado['error']) ? $resultado['error'] : $mensajeRes;
                 $mensaje = "Finalizado con error: $error";
             }
@@ -97,7 +94,7 @@ class CierreDia extends Job
             $enviado = Mensajero::EnviarCorreo(
                 $envio['destinatarios'],
                 "Cierre del día $fechaFmt",
-                Mensajero::Notificaciones($this->PLantilla_mail_Cierre_Dia($datos)),
+                Mensajero::Notificaciones($this->Plantilla_mail_Cierre_Dia($datos)),
                 [],
                 $envio['copiaHistorico']
             );
@@ -167,7 +164,7 @@ class CierreDia extends Job
         return array_values(array_unique($destinatarios));
     }
 
-    public function PLantilla_mail_Cierre_Dia($datos)
+    public function Plantilla_mail_Cierre_Dia($datos)
     {
         $fmtMoneda = function ($n) {
             $n = (float) $n;
@@ -1044,6 +1041,27 @@ class CierreDia extends Job
             </table>
         HTML;
     }
+
+    public function RenviarCorreo($fecha, $proceso)
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha))
+            return self::SaveLog("Debe especificar una fecha válida (YYYY-MM-DD).");
+
+        if (is_null($proceso)) return self::SaveLog("Debe especificar un ID de proceso.");
+
+        $datos = JobsDao::ResultadoCierreDia($fecha, $proceso);
+        if (!$datos['success'])
+            return self::SaveLog($datos['mensaje']);
+        
+        $datos = $datos['datos'];
+        $texto = trim($datos['MENSAJE']);
+        $lineas = preg_split('/\r\n|\r|\n/', $texto);
+        $mensajeRes = end($lineas);
+        $datos['MENSAJE'] = $mensajeRes;
+        $res = self::EnviarCorreoResultado($datos);
+        $final = $res['mensaje'] . (!empty($res['error']) ? ' ' . $res['error'] : '') . "\n";
+        self::SaveLog($final);
+    }
 }
 
 if (isset($argv[1])) {
@@ -1053,24 +1071,12 @@ if (isset($argv[1])) {
         case 'CierreDia':
             $jobs->CierreDia($argv[2] ?? null, $argv[3] ?? null, isset($argv[4]) ? (int) $argv[4] : 0);
             break;
-        case 'EnviarCorreo':
-            $fecha = $argv[2] ?? '';
-            $proceso = $argv[3] ?? '';
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
-                echo "Debe especificar una fecha válida (YYYY-MM-DD).\n";
-                break;
-            }
-            $datos = JobsDao::ResultadoTerminadoCierreDia($fecha, $proceso);
-            if ($datos === null) {
-                echo "No se encontró un resultado terminado del cierre para la fecha indicada.\n";
-                break;
-            }
-            $res = $jobs->EnviarCorreoResultado($datos);
-            echo $res['mensaje'] . (!empty($res['error']) ? ' ' . $res['error'] : '') . "\n";
+        case 'RenviarCorreo':
+            $jobs->RenviarCorreo($argv[2] ?? null, $argv[3] ?? null);
             break;
         case 'help':
             echo "CierreDia [fecha YYYY-MM-DD] [usuario] [regenerar 0|1]: Ejecuta el cierre del día y envía el correo de resultado\n";
-            echo "EnviarCorreo [fecha YYYY-MM-DD]: Envía el correo del último resultado terminado sin ejecutar el cierre\n";
+            echo "EnviarCorreo [fecha YYYY-MM-DD] [id_proceso]: Envía el correo del último resultado terminado sin ejecutar el cierre\n";
             break;
         default:
             echo "No se encontró el job especificado.\n";

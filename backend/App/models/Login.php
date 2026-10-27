@@ -33,6 +33,7 @@ class Login
                 , 'PLDCO' ----- USUARIO OCOF
                 , 'REPOR' 
                 , 'CONS' 
+                , 'AT'
             )
         sql;
 

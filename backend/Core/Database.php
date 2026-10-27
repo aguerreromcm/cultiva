@@ -23,7 +23,7 @@ class Database
 
     private function Conecta($s = null, $u = null, $p = null)
     {
-        $s = $this->configuracion[$s] ?? $s;
+        if ($s !== null) $s = $this->configuracion[$s] ?? $s;
         $servidor = $s ?? $this->configuracion['SERVIDOR'];
         $esquema = $this->configuracion['ESQUEMA'] ?? 'ESIACOM';
         $puerto = trim((string) ($this->configuracion['PUERTO'] ?? ''));
@@ -136,7 +136,9 @@ class Database
         try {
             $stmt = $this->db_activa->prepare($sql);
             $stmt->execute($params);
-            return array_shift($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+            $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return array_shift($resultados);
         } catch (\PDOException $e) {
             self::muestraError($e, $sql, $params);
             return [];
