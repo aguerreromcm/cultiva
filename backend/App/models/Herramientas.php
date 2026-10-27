@@ -27,6 +27,16 @@ class Herramientas extends Model
         return $ts !== false ? date('Y-m-d', $ts) : null;
     }
 
+    /**
+     * Redondea a 2 decimales con medio centavo hacia arriba (igual que ROUND de Oracle).
+     * Desde PHP 8.4 round(16.65 / 30, 2) da 0.55 porque el flotante es 0.55499999...;
+     * el pre-redondeo a 9 decimales recupera el 0.555 exacto antes de redondear.
+     */
+    private static function redondearMonto(float $valor): float
+    {
+        return round(round($valor, 9), 2);
+    }
+
     private static function getAuditoriaDevengoLogPath(): string
     {
         return defined('APPPATH')
@@ -577,7 +587,7 @@ SQL;
             $cdgpe = trim((string) ($base['CDGPE'] ?? 'AMGM'));
             $periodicidad = trim((string) ($base['PERIODICIDAD'] ?? 'S'));
             $plazo = (int) ($base['PLAZO'] ?? 0);
-            $devengoDiarioFijo = $plazoDias > 0 ? round($devengoTotal / $plazoDias, 2) : 0.0;
+            $devengoDiarioFijo = $plazoDias > 0 ? self::redondearMonto($devengoTotal / $plazoDias) : 0.0;
             $acumulado = 0.0;
 
             $filasGrupo = [];
@@ -597,11 +607,11 @@ SQL;
                 $fechaCalc = $item['fecha'];
                 $diasDev = (int) round((strtotime($fechaCalc . ' 12:00:00') - strtotime($inicioStr . ' 12:00:00')) / 86400);
                 $esUltimoDia = ($fechaCalc === $finStr);
-                $devDiario = $esUltimoDia ? round($devengoTotal - $acumulado, 2) : $devengoDiarioFijo;
-                $devDiario = round($devDiario, 2);
-                $acumulado = round($acumulado + $devDiario, 2);
-                $devDiarioSinIva = round($devDiario / (1 + $iva), 2);
-                $ivaInt = round($devDiario - $devDiarioSinIva, 2);
+                $devDiario = $esUltimoDia ? self::redondearMonto($devengoTotal - $acumulado) : $devengoDiarioFijo;
+                $devDiario = self::redondearMonto($devDiario);
+                $acumulado = self::redondearMonto($acumulado + $devDiario);
+                $devDiarioSinIva = self::redondearMonto($devDiario / (1 + $iva));
+                $ivaInt = self::redondearMonto($devDiario - $devDiarioSinIva);
 
                 $filas[$idx]['FECHA_CALC_ISO'] = $fechaCalc;
                 $filas[$idx]['CDGEM'] = $cdgem;
@@ -693,9 +703,8 @@ SQL;
         SQL;
 
         $stmtInsert = $db->db_activa->prepare($sqlInsert);
-        $stmtCheck = $db->db_activa->prepare(
-            "SELECT 1 FROM ESIACOM.DEVENGO_DIARIO WHERE CDGCLNS = :credito AND CICLO = :ciclo AND TRUNC(FECHA_CALC) = TO_DATE(:fecha_calc, 'YYYY-MM-DD')"
-        );
+        // Con pdo_oci en PHP 8.5, re-ejecutar un SELECT ya preparado tumba el proceso; se prepara en cada vuelta.
+        $sqlCheck = "SELECT 1 FROM ESIACOM.DEVENGO_DIARIO WHERE CDGCLNS = :credito AND CICLO = :ciclo AND TRUNC(FECHA_CALC) = TO_DATE(:fecha_calc, 'YYYY-MM-DD')";
 
         $insertados = 0;
         foreach ($filas as $fila) {
@@ -710,6 +719,7 @@ SQL;
             }
 
             try {
+                $stmtCheck = $db->db_activa->prepare($sqlCheck);
                 $stmtCheck->execute([
                     'credito' => $credito,
                     'ciclo' => $ciclo,
@@ -833,7 +843,7 @@ SQL;
         $cdgem = $datosBase['CDGEM'] ?? 'EMPFIN';
         $periodicidad = $datosBase['PERIODICIDAD'] ?? 'S';
         $plazo = (int) ($datosBase['PLAZO'] ?? 0);
-        $devengoDiarioFijo = $plazoDias > 0 ? round($devengoTotal / $plazoDias, 2) : 0.0;
+        $devengoDiarioFijo = $plazoDias > 0 ? self::redondearMonto($devengoTotal / $plazoDias) : 0.0;
         $acumulado = 0.0;
         $insertados = 0;
 
@@ -865,11 +875,11 @@ SQL;
             }
 
             $esUltimoDia = ($fechaCalc === $finStr);
-            $devDiario = $esUltimoDia ? round($devengoTotal - $acumulado, 2) : $devengoDiarioFijo;
-            $devDiario = round($devDiario, 2);
-            $acumulado = round($acumulado + $devDiario, 2);
-            $devDiarioSinIva = round($devDiario / (1 + $iva), 2);
-            $ivaInt = round($devDiario - $devDiarioSinIva, 2);
+            $devDiario = $esUltimoDia ? self::redondearMonto($devengoTotal - $acumulado) : $devengoDiarioFijo;
+            $devDiario = self::redondearMonto($devDiario);
+            $acumulado = self::redondearMonto($acumulado + $devDiario);
+            $devDiarioSinIva = self::redondearMonto($devDiario / (1 + $iva));
+            $ivaInt = self::redondearMonto($devDiario - $devDiarioSinIva);
 
             try {
                 $stmtCheck = $db->db_activa->prepare(
