@@ -64,32 +64,9 @@ class CierreDia extends Job
                 $mensaje = "Finalizado con error: $error";
             }
 
-            $envio = $this->destinosCorreoCierreDia($exito === 1);
-            $dest = $envio['destinatarios'];
-            $copiaHistorico = $envio['copiaHistorico'];
-
-            if (!empty($dest) && !empty($resultado['datos'])) {
-                try {
-                    $fechaFmt = new \DateTime($fecha);
-                    $fechaFmt = $fechaFmt->format('d/m/Y');
-                    $enviado = Mensajero::EnviarCorreo(
-                        $dest,
-                        "Cierre del día $fechaFmt",
-                        Mensajero::Notificaciones(self::PLantilla_mail_Cierre_Dia($resultado['datos'])),
-                        [],
-                        $copiaHistorico
-                    );
-                    if ($enviado) {
-                        $resCorreo = JobsDao::CorreoCierreDia($resultado['datos']);
-                        self::SaveLog('Estatus del correo: ' . $resCorreo['mensaje'] . ' -> ' . ($resCorreo['error'] ?? ''));
-                    } else {
-                        self::SaveLog('El correo de resumen no se pudo enviar (SMTP).');
-                    }
-                } catch (\Throwable $e) {
-                    self::SaveLog('Error al enviar correo: ' . $e->getMessage());
-                }
-            } elseif (empty($dest)) {
-                self::SaveLog('Sin destinatarios: no se envió correo de cierre.');
+            if (!empty($resultado['datos'])) {
+                $resCorreo = $this->EnviarCorreoResultado($resultado['datos']);
+                self::SaveLog($resCorreo['mensaje'] . (!empty($resCorreo['error']) ? ' -> ' . $resCorreo['error'] : ''));
             }
 
             self::SaveLog($mensaje);
@@ -98,6 +75,53 @@ class CierreDia extends Job
         } finally {
             CierreDiaJobLock::liberarJob();
         }
+    }
+
+    /**
+     * Envía el correo de un resultado de cierre ya terminado.
+     */
+    public function EnviarCorreoResultado(array $datos): array
+    {
+        $exito = (int) ($datos['EXITO'] ?? 0) === 1;
+        $envio = $this->destinosCorreoCierreDia($exito);
+        if (empty($envio['destinatarios'])) {
+            return self::respuestaCorreo(false, 'No hay destinatarios configurados para el correo de cierre.');
+        }
+
+        try {
+            $fecha = \DateTime::createFromFormat('d/m/Y', (string) ($datos['FECHA_CALCULO'] ?? ''));
+            if (!$fecha) {
+                return self::respuestaCorreo(false, 'El resultado del cierre no tiene una fecha válida.');
+            }
+            $fechaFmt = $fecha->format('d/m/Y');
+            $enviado = Mensajero::EnviarCorreo(
+                $envio['destinatarios'],
+                "Cierre del día $fechaFmt",
+                Mensajero::Notificaciones($this->PLantilla_mail_Cierre_Dia($datos)),
+                [],
+                $envio['copiaHistorico']
+            );
+            if (!$enviado) {
+                return self::respuestaCorreo(false, 'El correo de resumen no se pudo enviar (SMTP).');
+            }
+
+            $resCorreo = JobsDao::CorreoCierreDia($datos);
+            if (empty($resCorreo['success'])) {
+                return self::respuestaCorreo(false, 'El correo se envió, pero no se pudo actualizar su estatus.', $resCorreo['error'] ?? null);
+            }
+            return self::respuestaCorreo(true, 'Correo de resumen enviado correctamente.');
+        } catch (\Throwable $e) {
+            return self::respuestaCorreo(false, 'Error al enviar correo.', $e->getMessage());
+        }
+    }
+
+    private static function respuestaCorreo(bool $success, string $mensaje, ?string $error = null): array
+    {
+        $respuesta = ['success' => $success, 'mensaje' => $mensaje];
+        if ($error !== null && $error !== '') {
+            $respuesta['error'] = $error;
+        }
+        return $respuesta;
     }
 
     /**
@@ -1029,8 +1053,24 @@ if (isset($argv[1])) {
         case 'CierreDia':
             $jobs->CierreDia($argv[2] ?? null, $argv[3] ?? null, isset($argv[4]) ? (int) $argv[4] : 0);
             break;
+        case 'EnviarCorreo':
+            $fecha = $argv[2] ?? '';
+            $proceso = $argv[3] ?? '';
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+                echo "Debe especificar una fecha válida (YYYY-MM-DD).\n";
+                break;
+            }
+            $datos = JobsDao::ResultadoTerminadoCierreDia($fecha, $proceso);
+            if ($datos === null) {
+                echo "No se encontró un resultado terminado del cierre para la fecha indicada.\n";
+                break;
+            }
+            $res = $jobs->EnviarCorreoResultado($datos);
+            echo $res['mensaje'] . (!empty($res['error']) ? ' ' . $res['error'] : '') . "\n";
+            break;
         case 'help':
             echo "CierreDia [fecha YYYY-MM-DD] [usuario] [regenerar 0|1]: Ejecuta el cierre del día y envía el correo de resultado\n";
+            echo "EnviarCorreo [fecha YYYY-MM-DD]: Envía el correo del último resultado terminado sin ejecutar el cierre\n";
             break;
         default:
             echo "No se encontró el job especificado.\n";

@@ -10,6 +10,39 @@ use Core\Database;
 
 class CierreDia extends Model
 {
+    public static function ResultadoTerminadoCierreDia(string $fecha, string $proceso): ?array
+    {
+        $qry = <<<SQL
+            SELECT
+                TO_CHAR(b.FECHA_CALCULO, 'DD/MM/YYYY') AS FECHA_CALCULO,
+                b.USUARIO,
+                TO_CHAR(b.INICIO, 'DD/MM/YYYY HH24:MI') AS INICIO,
+                TO_CHAR(b.FIN, 'DD/MM/YYYY HH24:MI') AS FIN,
+                NVL(b.EXITO, 0) AS EXITO,
+                b.ID_IMPORTACION,
+                b.ID_PROCESO,
+                b.MENSAJE,
+                b.CIERRE_REGISTROS,
+                b.DEVENGO_REGISTROS,
+                b.DEVENGO_MONTO,
+                TO_CHAR(b.FECHA_CALCULO + 1, 'DD/MM/YYYY') AS DEVENGO_FECHA
+            FROM BITACORA_CIERRE_DIARIO b
+            WHERE TRUNC(b.FECHA_CALCULO) = TO_DATE(:fecha, 'YYYY-MM-DD')
+              AND b.ID_IMPORTACION IS NOT NULL
+              AND b.FIN IS NOT NULL
+              AND b.ID_PROCESO = :proceso
+            ORDER BY b.INICIO DESC NULLS LAST
+            FETCH FIRST 1 ROW ONLY
+        SQL;
+
+        try {
+            $r = (new Database())->queryOne($qry, ['fecha' => $fecha, 'proceso' => $proceso]);
+            return is_array($r) && !empty($r) ? $r : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public static function CierreDia($datos)
     {
         $fecha = isset($datos['fecha']) ? trim((string) $datos['fecha']) : '';
