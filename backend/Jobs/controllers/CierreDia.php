@@ -27,15 +27,12 @@ class CierreDia extends Job
     {
         set_time_limit(0);
         self::SaveLog('Inicio');
-        if (empty($fecha) || empty($usuario)) {
-            self::SaveLog('Finalizado con error: Fecha y usuario son requeridos');
-            return;
-        }
+        if (empty($fecha) || empty($usuario))
+            return self::SaveLog('Finalizado con error: Fecha y usuario son requeridos');
 
         if (!CierreDiaJobLock::adquirirJob()) {
             $motivo = CierreDiaJobLock::ultimoError();
-            self::SaveLog('Finalizado sin ejecutar el SP: ' . ($motivo !== '' ? $motivo : 'ya hay un Job de cierre de día en ejecución'));
-            return;
+            return self::SaveLog('Finalizado sin ejecutar el SP: ' . ($motivo !== '' ? $motivo : 'ya hay un Job de cierre de día en ejecución'));
         }
 
         $mensajeRes = null;
@@ -61,14 +58,11 @@ class CierreDia extends Job
                 $mensaje = "Finalizado con error: $error";
             }
 
-            if (!empty($resultado['datos'])) {
-                $resCorreo = $this->EnviarCorreoResultado($resultado['datos']);
-                self::SaveLog($resCorreo['mensaje'] . (!empty($resCorreo['error']) ? ' -> ' . $resCorreo['error'] : ''));
-            }
-
+            if (!empty($resultado['datos'])) self::SaveLog($this->EnviarCorreoResultado($resultado['datos']));
+            
             self::SaveLog($mensaje);
         } catch (\Throwable $e) {
-            self::SaveLog('Finalizado con error: ' . $e->getMessage());
+            self::SaveLog('Finalizado con error: ' . $e->getMessage() . ':' . join('<br>', $e->getTrace()));
         } finally {
             CierreDiaJobLock::liberarJob();
         }
@@ -77,20 +71,18 @@ class CierreDia extends Job
     /**
      * Envía el correo de un resultado de cierre ya terminado.
      */
-    public function EnviarCorreoResultado(array $datos): array
+    public function EnviarCorreoResultado(array $datos): string
     {
         $exito = (int) ($datos['EXITO'] ?? 0) === 1;
         $envio = $this->destinosCorreoCierreDia($exito);
-        if (empty($envio['destinatarios'])) {
-            return self::respuestaCorreo(false, 'No hay destinatarios configurados para el correo de cierre.');
-        }
-
+        if (empty($envio['destinatarios'])) return 'No hay destinatarios configurados para el correo de cierre.';
+    
         try {
             $fecha = \DateTime::createFromFormat('d/m/Y', (string) ($datos['FECHA_CALCULO'] ?? ''));
-            if (!$fecha) {
-                return self::respuestaCorreo(false, 'El resultado del cierre no tiene una fecha válida.');
-            }
+            if (!$fecha) return 'El resultado del cierre no tiene una fecha válida.';
+
             $fechaFmt = $fecha->format('d/m/Y');
+            
             $enviado = Mensajero::EnviarCorreo(
                 $envio['destinatarios'],
                 "Cierre del día $fechaFmt",
@@ -98,27 +90,16 @@ class CierreDia extends Job
                 [],
                 $envio['copiaHistorico']
             );
-            if (!$enviado) {
-                return self::respuestaCorreo(false, 'El correo de resumen no se pudo enviar (SMTP).');
-            }
+            
+            if (!$enviado) return 'El correo de resumen no se pudo enviar (SMTP).';
 
             $resCorreo = JobsDao::CorreoCierreDia($datos);
-            if (empty($resCorreo['success'])) {
-                return self::respuestaCorreo(false, 'El correo se envió, pero no se pudo actualizar su estatus.', $resCorreo['error'] ?? null);
-            }
-            return self::respuestaCorreo(true, 'Correo de resumen enviado correctamente.');
-        } catch (\Throwable $e) {
-            return self::respuestaCorreo(false, 'Error al enviar correo.', $e->getMessage());
-        }
-    }
+            if (empty($resCorreo['success'])) return 'El correo se envió, pero no se pudo actualizar su estatus.' . $resCorreo['error'] ?? null;
 
-    private static function respuestaCorreo(bool $success, string $mensaje, ?string $error = null): array
-    {
-        $respuesta = ['success' => $success, 'mensaje' => $mensaje];
-        if ($error !== null && $error !== '') {
-            $respuesta['error'] = $error;
+            return 'Correo de resumen enviado correctamente.';
+        } catch (\Throwable $e) {
+            return 'Error al enviar correo:' . $e->getMessage();
         }
-        return $respuesta;
     }
 
     /**
@@ -167,48 +148,22 @@ class CierreDia extends Job
     public function Plantilla_mail_Cierre_Dia($datos)
     {
         $fmtMoneda = function ($n) {
-            $n = (float) $n;
-            if (class_exists(\NumberFormatter::class)) {
-                $fmt = new \NumberFormatter('es_MX', \NumberFormatter::CURRENCY);
-                return $fmt->formatCurrency($n, 'MXN') ?? '$0.00';
-            }
             return '$ ' . number_format($n, 2);
         };
-        $fmtFecha = function ($dmy) {
-            $dt = \DateTime::createFromFormat('d/m/Y', (string) $dmy);
-            if (!$dt) {
-                return $dmy ?: 'N/A';
-            }
-            if (class_exists(\IntlDateFormatter::class)) {
-                $fecha = new \IntlDateFormatter(
-                    'es_ES',
-                    \IntlDateFormatter::LONG,
-                    \IntlDateFormatter::NONE,
-                    'America/Mexico_City',
-                    \IntlDateFormatter::GREGORIAN,
-                    "d 'de' MMMM 'de' y"
-                );
-                $out = $fecha->format($dt);
-                return $out !== false ? $out : $dt->format('d/m/Y');
-            }
-            return $dt->format('d/m/Y');
-        };
-        $devengoFecha = isset($datos['DEVENGO_FECHA']) && trim((string) $datos['DEVENGO_FECHA']) !== ''
-            ? $datos['DEVENGO_FECHA']
-            : 'N/A';
-        $resumen = JobsDao::GetResumenCierreDia($datos);
 
-        $fecha_calculo = isset($datos['FECHA_CALCULO']) ? $fmtFecha($datos['FECHA_CALCULO']) : 'N/A';
-
+        $devengoFecha = isset($datos['DEVENGO_FECHA']) ? $datos['DEVENGO_FECHA'] : 'N/A';
+        $fecha_calculo = isset($datos['FECHA_CALCULO']) ? $datos['FECHA_CALCULO'] : 'N/A';
         $devengo_registros = isset($datos['DEVENGO_REGISTROS']) ? $datos['DEVENGO_REGISTROS'] : '0';
         $devengo_monto = isset($datos['DEVENGO_MONTO']) ? $fmtMoneda($datos['DEVENGO_MONTO'] ?? 0) : '$ 0.00';
+
+        $resumen = JobsDao::GetResumenCierreDia($datos);
 
         if ($resumen['success']) {
             $pagos = $resumen['datos']['pagos'] ?? [];
             $detalle = $resumen['datos']['detalle'] ?? [];
             $mp = $resumen['datos']['mp'] ?? [];
             $garantias = $resumen['datos']['garantias'] ?? [];
-
+            
             $pagos_total_registros = $pagos['TOTAL_REGISTROS'] ?? 0;
             $pagos_total_monto = $fmtMoneda($pagos['TOTAL_MONTO'] ?? 0);
             $pagos_pendiente_registros = $pagos['PENDIENTES_REGISTROS'] ?? 0;
@@ -1058,9 +1013,7 @@ class CierreDia extends Job
         $lineas = preg_split('/\r\n|\r|\n/', $texto);
         $mensajeRes = end($lineas);
         $datos['MENSAJE'] = $mensajeRes;
-        $res = self::EnviarCorreoResultado($datos);
-        $final = $res['mensaje'] . (!empty($res['error']) ? ' ' . $res['error'] : '') . "\n";
-        self::SaveLog($final);
+        self::SaveLog(self::EnviarCorreoResultado($datos));
     }
 }
 

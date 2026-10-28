@@ -28,7 +28,6 @@ class CierreDia extends Model
                 TO_CHAR(b.FECHA_CALCULO + 1, 'DD/MM/YYYY') AS DEVENGO_FECHA
             FROM BITACORA_CIERRE_DIARIO b
             WHERE TRUNC(b.FECHA_CALCULO) = TO_DATE(:fecha, 'YYYY-MM-DD')
-              AND b.ID_IMPORTACION IS NOT NULL
               AND b.FIN IS NOT NULL
               AND b.ID_PROCESO = :proceso
             ORDER BY b.INICIO DESC NULLS LAST
@@ -59,12 +58,7 @@ class CierreDia extends Model
             $sp = "CALL SP_PAGOS_CIERRE_DEVENGO(TO_DATE(:fecha, 'YYYY-MM-DD'), :usuario, :output)";
 
             $id_proceso = $db->EjecutaSP($sp, ['fecha' => $fecha, 'usuario' => $usuario]);
-            $res = self::ResultadoCierreDia($fecha, $id_proceso);
-            if (!$res['success']) return $res;
-
-            return ((int) ($res['EXITO'] ?? 0) === 1) ?
-                self::Responde(true, 'Proceso exitoso', $res) :
-                self::Responde(false, 'Error en el proceso', $res);
+            return self::ResultadoCierreDia($fecha, $id_proceso);
         } catch (\Throwable $e) {
             return self::Responde(false, 'Error al ejecutar el SP de cierre de día.', null, $e->getMessage());
         }
@@ -147,13 +141,11 @@ class CierreDia extends Model
             UPDATE BITACORA_CIERRE_DIARIO
             SET CORREO = 1
             WHERE TRUNC(FECHA_CALCULO) = TO_DATE(:fecha, 'DD/MM/YYYY')
-                AND ID_IMPORTACION = :id_importacion
                 AND ID_PROCESO = :id_proceso
         SQL;
 
         $params = [
             'fecha' => $datos['FECHA_CALCULO'],
-            'id_importacion' => $datos['ID_IMPORTACION'],
             'id_proceso' => $datos['ID_PROCESO']
         ];
 
