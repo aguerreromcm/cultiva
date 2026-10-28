@@ -29,7 +29,6 @@ class CierreDiaRepository
             FROM BITACORA_CIERRE_DIARIO
             WHERE FIN IS NULL
               AND INICIO IS NOT NULL
-              AND ID_IMPORTACION IS NOT NULL
             ORDER BY INICIO DESC
             FETCH FIRST 1 ROW ONLY
         SQL;
@@ -146,7 +145,6 @@ class CierreDiaRepository
                 b.MENSAJE
             FROM BITACORA_CIERRE_DIARIO b
             WHERE TRUNC(b.FECHA_CALCULO) = TO_DATE(:fecha, 'YYYY-MM-DD')
-              AND b.ID_IMPORTACION IS NOT NULL
             ORDER BY b.INICIO DESC NULLS LAST
             FETCH FIRST 1 ROW ONLY
         SQL;
