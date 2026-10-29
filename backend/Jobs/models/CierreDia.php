@@ -58,6 +58,8 @@ class CierreDia extends Model
             $sp = "CALL SP_PAGOS_CIERRE_DEVENGO(TO_DATE(:fecha, 'YYYY-MM-DD'), :usuario, :output)";
 
             $id_proceso = $db->EjecutaSP($sp, ['fecha' => $fecha, 'usuario' => $usuario]);
+            
+            if (is_null($id_proceso)) return self::Responde(false, 'El SP de cierre de día, no devolvio el id del proceso.');
             return self::ResultadoCierreDia($fecha, $id_proceso);
         } catch (\Throwable $e) {
             return self::Responde(false, 'Error al ejecutar el SP de cierre de día.', null, $e->getMessage());
