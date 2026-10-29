@@ -109,7 +109,7 @@ class Menu
         return [
             $this->enlace('Reporte de Referencias', '/Creditos/ReporteReferencias/', $permisos),
             $this->enlace('Reporte de Prestamos', '/Creditos/ReportePrestamos/', $permisos),
-            $this->enlace('Reasignación', '/Creditos/Reasignacion/', ['ADMIN', 'CAMAG', 'ORHM', 'MAPH']),
+            $this->enlace('Reasignación', '/Creditos/Reasignacion/', ['ADMIN', 'CAMAG', 'MAPH', 'FECR']),
         ];
     }
 
