@@ -1002,7 +1002,7 @@ class CierreDia extends Job
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha))
             return self::SaveLog("Debe especificar una fecha válida (YYYY-MM-DD).");
 
-        if (is_null($proceso)) return self::SaveLog("Debe especificar un ID de proceso.");
+        if (empty($proceso)) return self::SaveLog("Debe especificar un ID de proceso.");
 
         $datos = JobsDao::ResultadoCierreDia($fecha, $proceso);
         if (!$datos['success'])
@@ -1022,14 +1022,14 @@ if (isset($argv[1])) {
 
     switch ($argv[1]) {
         case 'CierreDia':
-            $jobs->CierreDia($argv[2] ?? null, $argv[3] ?? null, isset($argv[4]) ? (int) $argv[4] : 0);
+            $jobs->CierreDia($argv[2] ?? '', $argv[3] ?? '', isset($argv[4]) ? (int) $argv[4] : 0);
             break;
         case 'RenviarCorreo':
-            $jobs->RenviarCorreo($argv[2] ?? null, $argv[3] ?? null);
+            $jobs->RenviarCorreo($argv[2] ?? '', $argv[3] ?? '');
             break;
         case 'help':
             echo "CierreDia [fecha YYYY-MM-DD] [usuario] [regenerar 0|1]: Ejecuta el cierre del día y envía el correo de resultado\n";
-            echo "EnviarCorreo [fecha YYYY-MM-DD] [id_proceso]: Envía el correo del último resultado terminado sin ejecutar el cierre\n";
+            echo "RenviarCorreo [fecha YYYY-MM-DD] [id_proceso]: Renvía el correo de conclusión de cierre\n";
             break;
         default:
             echo "No se encontró el job especificado.\n";
