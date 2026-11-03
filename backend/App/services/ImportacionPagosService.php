@@ -13,6 +13,13 @@ use Core\Model;
  */
 class ImportacionPagosService
 {
+    /** Clave inicial de la referencia => descripción del tipo de registro. */
+    private const TIPOS_REGISTRO = [
+        'P' => 'pago',
+        'G' => 'garantía',
+        '0' => 'seguro',
+    ];
+
     /**
      * Previsualiza el archivo sin insertar en base de datos.
      *
@@ -291,9 +298,13 @@ class ImportacionPagosService
         $credito = str_pad(preg_replace('/\D/', '', (string) ($datos['credito'] ?? '')), 6, '0', STR_PAD_LEFT);
         $ciclo = ImportacionPagosRepository::normalizarCiclo((string) ($datos['ciclo'] ?? ''));
         $usuario = trim((string) ($datos['usuario'] ?? ''));
+        $tipoRegistro = strtoupper(trim((string) ($datos['tipo_registro'] ?? 'P')));
 
         if ($fecha === '' || $secuencia === '' || $credito === '' || $ciclo === '') {
             return Model::Responde(false, 'Fecha, secuencia, crédito y ciclo son obligatorios.');
+        }
+        if (!isset(self::TIPOS_REGISTRO[$tipoRegistro])) {
+            return Model::Responde(false, 'El tipo de registro no es válido.');
         }
 
         $repo = new ImportacionPagosRepository();
@@ -318,17 +329,19 @@ class ImportacionPagosService
             return Model::Responde(false, 'El crédito no tiene tipo de producto (CDGTPC) para generar la referencia.');
         }
 
-        $referencia = $repo->generarReferencia($credito, $cdgtpc);
+        $referencia = $repo->generarReferencia($credito, $cdgtpc, $tipoRegistro);
         if ($referencia === null) {
-            return Model::Responde(false, 'No se pudo generar la referencia de pago.');
+            return Model::Responde(false, 'No se pudo generar la referencia.');
         }
 
+        // El cierre trata garantías y seguros como TIPO 'G' (movimiento que no es pago).
+        $tipo = $tipoRegistro === 'P' ? 'P' : 'G';
         $cdgocpe = trim((string) ($prn['CDGOCPE'] ?? ' '));
-        if (!$repo->corregirIncidencia($fecha, $secuencia, $credito, $ciclo, $referencia, $cdgocpe, $usuario)) {
+        if (!$repo->corregirIncidencia($fecha, $secuencia, $credito, $ciclo, $referencia, $cdgocpe, $tipo, $usuario)) {
             return Model::Responde(false, 'No se pudo actualizar el registro.');
         }
 
-        return Model::Responde(true, 'Incidencia corregida correctamente.', [
+        return Model::Responde(true, 'Incidencia corregida correctamente como ' . self::TIPOS_REGISTRO[$tipoRegistro] . '.', [
             'credito' => $credito,
             'ciclo' => $ciclo,
             'cdgtpc' => $cdgtpc,

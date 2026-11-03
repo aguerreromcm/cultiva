@@ -123,7 +123,7 @@
                     <div role="tabpanel" class="tab-pane" id="tab-incidencias">
                         <p class="ci-tab-intro">
                             Pagos con crédito <strong>000000</strong> y ciclo <strong>00</strong> por referencia inválida o crédito no encontrado.
-                            Capture el crédito y ciclo correctos de un préstamo en situación <strong>Entregado</strong>.
+                            Seleccione si es pago, garantía o seguro y capture el crédito y ciclo correctos de un préstamo en situación <strong>Entregado</strong>.
                             Las incidencias ya procesadas en el cierre no se pueden corregir.
                         </p>
                         <table class="table table-striped table-bordered table-hover" id="tabla-incidencias-importacion">
@@ -231,6 +231,14 @@
                     <strong>Monto:</strong> <span id="corr_monto"></span>
                 </div>
                 <div class="form-group">
+                    <label for="corr_tipo">Tipo de registro *</label>
+                    <select id="corr_tipo" class="form-control">
+                        <option value="P" selected>Pago</option>
+                        <option value="G">Garantía</option>
+                        <option value="0">Seguro</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="corr_credito">Número de crédito *</label>
                     <input type="text" id="corr_credito" class="form-control" maxlength="6" placeholder="000000" autocomplete="off">
                 </div>
@@ -240,7 +248,8 @@
                 </div>
                 <p class="text-muted small" style="margin-bottom: 0;">
                     Se validará que el crédito y ciclo correspondan a un préstamo en situación Entregado.
-                    La referencia se generará con el tipo de producto del préstamo (CDGTPC) y el dígito verificador.
+                    La referencia se generará con la clave del tipo de registro (P: pago, G: garantía, 0: seguro),
+                    el crédito, el tipo de producto del préstamo y el dígito verificador.
                 </p>
             </div>
             <div class="modal-footer">

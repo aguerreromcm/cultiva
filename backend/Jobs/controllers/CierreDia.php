@@ -54,7 +54,7 @@ class CierreDia extends Job
 
             $mensaje = "Cierre de día concluido: fecha $fecha - usuario $usuario";
             if (!$resultado['success']) {
-                $error = isset($resultado['error']) ? $resultado['error'] : $mensajeRes;
+                $error = $resultado['error'] ?? $mensajeRes ?? $resultado['mensaje'] ?? '';
                 $mensaje = "Finalizado con error: $error";
             }
 
