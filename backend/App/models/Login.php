@@ -34,6 +34,7 @@ class Login
                 , 'REPOR' 
                 , 'CONS' 
                 , 'AT'
+                , 'CYR'
             )
         sql;
 
