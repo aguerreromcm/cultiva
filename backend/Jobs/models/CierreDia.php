@@ -29,14 +29,13 @@ class CierreDia extends Model
             FROM BITACORA_CIERRE_DIARIO b
             WHERE TRUNC(b.FECHA_CALCULO) = TO_DATE(:fecha, 'YYYY-MM-DD')
               AND b.FIN IS NOT NULL
-              AND (b.ID_PROCESO = :proceso OR TO_CHAR(b.ID_IMPORTACION) = :importacion)
+              AND b.ID_PROCESO = :proceso
             ORDER BY b.INICIO DESC NULLS LAST
             FETCH FIRST 1 ROW ONLY
         SQL;
 
-        // SP_PAGOS_CIERRE_DEVENGO devuelve ID_IMPORTACION (se repite entre intentos de la misma fecha); RenviarCorreo recibe ID_PROCESO.
         try {
-            $r = (new Database())->queryOne($qry, ['fecha' => $fecha, 'proceso' => $proceso, 'importacion' => $proceso]);
+            $r = (new Database())->queryOne($qry, ['fecha' => $fecha, 'proceso' => $proceso]);
             return is_array($r) ?
                 self::Responde(true, "Datos de cierre obtenidos", $r) :
                 self::Responde(false, "Datos de cierre no encontrados");
@@ -84,11 +83,6 @@ class CierreDia extends Model
                 AND TRUNC(FECHA) = TO_DATE(:fecha, 'DD/MM/YYYY')
         SQL;
 
-        // Un pago se procesa una sola vez, pero el cierre de la fecha puede regenerarse en otra ejecución.
-        $procesosFecha = <<<SQL
-            SELECT ID_PROCESO FROM BITACORA_CIERRE_DIARIO WHERE TRUNC(FECHA_CALCULO) = TO_DATE(:fecha, 'DD/MM/YYYY')
-        SQL;
-
         $det = <<<SQL
             SELECT SUM(DECODE(VALIDACION, 0, 1, 0)) AS PAGOS_REGISTROS
                 , SUM(DECODE(VALIDACION, 0, MONTO, 0)) AS PAGOS_MONTO
@@ -97,9 +91,8 @@ class CierreDia extends Model
                 , SUM(DECODE(VALIDACION, 2, 1, 0)) AS INCIDENCIAS_REGISTROS
                 , SUM(DECODE(VALIDACION, 2, MONTO, 0)) AS INCIDENCIAS_MONTO
             FROM RES_IMPOR
-            WHERE IDENTIFICADOR IN ({$procesosFecha})
+            WHERE IDENTIFICADOR = :id_proceso
             AND CTABANCARIA <> '12'
-            AND NVL(MSGRESUL, ' ') NOT LIKE 'spImportaPagoSOF - No se puede importar%'
         SQL;
 
         $mp = <<<SQL
@@ -121,7 +114,7 @@ class CierreDia extends Model
                 , SUM(DECODE(RENEXCEL, 2, 1, 0)) AS POR_FECHA
                 , SUM(DECODE(RENEXCEL, 2, MONTO, 0)) AS POR_FECHA_MONTO
             FROM RES_IMPOR
-            WHERE IDENTIFICADOR IN ({$procesosFecha})
+            WHERE IDENTIFICADOR = :id_proceso
             AND CTABANCARIA = '12'
             AND VALIDACION = 0
         SQL;
@@ -129,9 +122,9 @@ class CierreDia extends Model
         try {
             $db = new Database();
             $res_pagos = $db->queryOne($pagos, ['fecha' => $datos['FECHA_CALCULO']]);
-            $res_det = $db->queryOne($det, ['fecha' => $datos['FECHA_CALCULO']]);
+            $res_det = $db->queryOne($det, ['id_proceso' => $datos['ID_PROCESO']]);
             $res_mp = $db->queryOne($mp, ['fecha' => $datos['FECHA_CALCULO']]);
-            $res_garantias = $db->queryOne($garantias, ['fecha' => $datos['FECHA_CALCULO']]);
+            $res_garantias = $db->queryOne($garantias, ['id_proceso' => $datos['ID_PROCESO']]);
 
             return self::Responde(true, 'Consulta exitosa', [
                 'pagos' => $res_pagos,

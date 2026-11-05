@@ -223,10 +223,10 @@ class ImportacionPagosRepository
     }
 
     /**
-     * Genera referencia: clave || crédito || CDGTPC || FN_DV(clave || crédito || CDGTPC).
-     * Clave: 'P' pago, 'G' garantía, '0' seguro. CDGTPC = tipo de producto en PRN (no el ciclo).
+     * Genera referencia de pago: 'P' || crédito || CDGTPC || FN_DV('P' || crédito || CDGTPC).
+     * CDGTPC = tipo de producto en PRN (no el ciclo).
      */
-    public function generarReferencia(string $credito, string $cdgtpc, string $clave): ?string
+    public function generarReferencia(string $credito, string $cdgtpc): ?string
     {
         $db = new Database();
         if ($db->db_activa === null) {
@@ -242,12 +242,11 @@ class ImportacionPagosRepository
             $cdgtpc = str_pad($cdgtpc, 2, '0', STR_PAD_LEFT);
         }
 
-        $base = $clave . $credito . $cdgtpc;
-        $sql = "SELECT :clave || :credito || :cdgtpc || FN_DV(:base) AS REFERENCIA FROM DUAL";
+        $base = 'P' . $credito . $cdgtpc;
+        $sql = "SELECT 'P' || :credito || :cdgtpc || FN_DV(:base) AS REFERENCIA FROM DUAL";
 
         try {
             $row = $db->queryOne($sql, [
-                'clave' => $clave,
                 'credito' => $credito,
                 'cdgtpc' => $cdgtpc,
                 'base' => $base,
@@ -749,7 +748,6 @@ class ImportacionPagosRepository
         string $ciclo,
         string $referencia,
         string $cdgocpe,
-        string $tipo,
         string $usuarioCorrige = ''
     ): bool {
         $db = new Database();
@@ -769,7 +767,6 @@ class ImportacionPagosRepository
                 CICLO = :ciclo,
                 REFERENCIA_ORIGINAL = NVL(REFERENCIA_ORIGINAL, REFERENCIA),
                 REFERENCIA = :referencia,
-                TIPO = :tipo,
                 CDGOCPE = :cdgocpe,
                 NOMBRE = NVL((SELECT NOMBRE FROM NS WHERE CDGEM = 'EMPFIN' AND CODIGO = :credito_ns), 'SIN IDENTIFICAR'),
                 EJECUTIVO = NVL((SELECT GET_NOMBRE_EMPLEADO(:cdgocpe_nom) FROM DUAL), ' '),
@@ -788,7 +785,6 @@ class ImportacionPagosRepository
             'credito' => $credito,
             'ciclo' => $ciclo,
             'referencia' => $referencia,
-            'tipo' => $tipo,
             'cdgocpe' => $cdgocpe,
             'credito_ns' => $credito,
             'cdgocpe_nom' => $cdgocpe,
