@@ -234,8 +234,7 @@
                     <label for="corr_tipo">Tipo de registro *</label>
                     <select id="corr_tipo" class="form-control">
                         <option value="P" selected>Pago</option>
-                        <option value="G">Garantía</option>
-                        <option value="0">Seguro</option>
+                        <option value="0">Garantía</option>
                     </select>
                 </div>
                 <div class="form-group">

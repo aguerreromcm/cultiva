@@ -733,11 +733,11 @@ class ImportacionPagosParser
 
         if ($corresponsal === self::CORRESPONSAL_OXXO) {
             $soloDigitos = preg_replace('/\D/', '', $referencia);
-            return ($soloDigitos !== null && strlen($soloDigitos) >= 19 && $soloDigitos[12] === '0') ? 'G' : 'P';
+            return ($soloDigitos !== null && strlen($soloDigitos) >= 19 && $soloDigitos[12] === '0') ? '0' : 'P';
         }
 
         $token = preg_split('/\s+/', strtoupper($referencia))[0] ?? '';
-        return (self::referenciaPaycashValida($token) && $token[0] === '0') ? 'G' : 'P';
+        return (self::referenciaPaycashValida($token) && $token[0] === '0') ? '0' : 'P';
     }
 
     /** Referencia BanCoppel de transferencia: "########### Transf. a FINANCIERA CULTIVA". */

@@ -226,7 +226,7 @@ class ImportacionPagosRepository
      * Genera referencia de pago: 'P' || crédito || CDGTPC || FN_DV('P' || crédito || CDGTPC).
      * CDGTPC = tipo de producto en PRN (no el ciclo).
      */
-    public function generarReferencia(string $credito, string $cdgtpc): ?string
+    public function generarReferencia(string $credito, string $cdgtpc, string $clave): ?string
     {
         $db = new Database();
         if ($db->db_activa === null) {
@@ -242,15 +242,11 @@ class ImportacionPagosRepository
             $cdgtpc = str_pad($cdgtpc, 2, '0', STR_PAD_LEFT);
         }
 
-        $base = 'P' . $credito . $cdgtpc;
-        $sql = "SELECT 'P' || :credito || :cdgtpc || FN_DV(:base) AS REFERENCIA FROM DUAL";
+        $base = $clave . $credito . $cdgtpc;
+        $sql = "SELECT :base || FN_DV(:base) AS REFERENCIA FROM DUAL";
 
         try {
-            $row = $db->queryOne($sql, [
-                'credito' => $credito,
-                'cdgtpc' => $cdgtpc,
-                'base' => $base,
-            ]);
+            $row = $db->queryOne($sql, ['base' => $base]);
             $ref = isset($row['REFERENCIA']) ? trim((string) $row['REFERENCIA']) : '';
             return $ref !== '' ? $ref : null;
         } catch (\Throwable $e) {
@@ -748,17 +744,14 @@ class ImportacionPagosRepository
         string $ciclo,
         string $referencia,
         string $cdgocpe,
+        string $tipo,
         string $usuarioCorrige = ''
     ): bool {
         $db = new Database();
-        if ($db->db_activa === null) {
-            return false;
-        }
+        if ($db->db_activa === null) return false;
 
         $usuarioCorrige = trim($usuarioCorrige);
-        if ($usuarioCorrige === '') {
-            $usuarioCorrige = ' ';
-        }
+        if ($usuarioCorrige === '') $usuarioCorrige = ' ';
 
         // Conserva REFERENCIA_ORIGINAL del layout; si aún es null, usa la referencia actual.
         $sql = <<<SQL
@@ -767,6 +760,7 @@ class ImportacionPagosRepository
                 CICLO = :ciclo,
                 REFERENCIA_ORIGINAL = NVL(REFERENCIA_ORIGINAL, REFERENCIA),
                 REFERENCIA = :referencia,
+                TIPO = :tipo,
                 CDGOCPE = :cdgocpe,
                 NOMBRE = NVL((SELECT NOMBRE FROM NS WHERE CDGEM = 'EMPFIN' AND CODIGO = :credito_ns), 'SIN IDENTIFICAR'),
                 EJECUTIVO = NVL((SELECT GET_NOMBRE_EMPLEADO(:cdgocpe_nom) FROM DUAL), ' '),
@@ -785,6 +779,7 @@ class ImportacionPagosRepository
             'credito' => $credito,
             'ciclo' => $ciclo,
             'referencia' => $referencia,
+            'tipo' => $tipo,
             'cdgocpe' => $cdgocpe,
             'credito_ns' => $credito,
             'cdgocpe_nom' => $cdgocpe,
