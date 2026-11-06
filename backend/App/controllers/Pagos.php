@@ -462,7 +462,7 @@ class Pagos extends Controller
             const aplicarBloqueoCierre = () => {
                 const b = cierreEnProceso;
                 $("body").toggleClass("ci-cierre-en-proceso", b);
-                $("#corresponsal, #archivo_layout, #btn_previsualizar, #fecha_cierre, #btn_procesar_cierre, #btn_guardar_correccion, #corr_credito, #corr_ciclo")
+                $("#corresponsal, #archivo_layout, #btn_previsualizar, #fecha_cierre, #btn_procesar_cierre, #btn_guardar_correccion, #corr_tipo, #corr_credito, #corr_ciclo")
                     .prop("disabled", b);
                 actualizaBotonExportar();
                 if (b) {
@@ -698,6 +698,7 @@ class Pagos extends Controller
                     $("#corr_secuencia").val(secuencia);
                     $("#corr_referencia").text(referencia);
                     $("#corr_monto").text(formateaMoneda(monto));
+                    $("#corr_tipo").val("P");
                     $("#corr_credito").val("");
                     $("#corr_ciclo").val("");
                     $("#modalCorregirIncidencia")
@@ -710,18 +711,21 @@ class Pagos extends Controller
                     if (bloqueadoPorCierre()) return;
                     const credito = ($("#corr_credito").val() || "").trim();
                     const ciclo = ($("#corr_ciclo").val() || "").trim();
+                    const tipoRegistro = $("#corr_tipo").val();
+                    const tipoTexto = $("#corr_tipo option:selected").text().toLowerCase();
                     if (!credito || !ciclo) {
                         return showWarning("Capture el crédito y el ciclo.");
                     }
                     const ok = await confirmarMovimiento(
                         "Confirmar corrección",
-                        "Se actualizará el pago con crédito " + credito + " y ciclo " + ciclo + ". ¿Desea continuar?"
+                        "Se actualizará el registro como " + tipoTexto + " con crédito " + credito + " y ciclo " + ciclo + ". ¿Desea continuar?"
                     );
                     if (!ok) return;
 
                     const datos = {
                         fecha: $("#corr_fecha").val(),
                         secuencia: $("#corr_secuencia").val(),
+                        tipo_registro: tipoRegistro,
                         credito: credito,
                         ciclo: ciclo
                     };
